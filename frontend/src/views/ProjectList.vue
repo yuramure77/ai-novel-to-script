@@ -1,84 +1,73 @@
 <template>
-  <div class="project-list-page">
+  <div class="app">
     <header class="navbar">
-      <div class="navbar-left">
-        <h1>小说转剧本</h1>
+      <div class="nav-left">
+        <h1>🎬 小说转剧本</h1>
       </div>
-      <div class="navbar-right">
-        <span class="navbar-user">{{ nickname }}</span>
-        <el-button text @click="handleLogout">退出</el-button>
+      <div class="nav-right">
+        <el-switch v-model="darkMode" inline-prompt active-text="🌙" inactive-text="☀️" @change="toggleDark" size="small" />
+        <span class="user">{{ nickname }}</span>
+        <el-button text size="small" @click="logout">退出</el-button>
       </div>
     </header>
 
     <main class="content">
-      <div class="content-header">
+      <div class="page-header">
         <h2>我的项目</h2>
         <el-button type="primary" @click="showCreate = true">新建项目</el-button>
       </div>
 
-      <el-empty v-if="!projects.length && !loading" description="暂无项目，点击上方按钮创建" />
+      <el-empty v-if="!projects.length && !loading" description="暂无项目" />
 
-      <div v-else class="project-grid">
-        <el-card
-          v-for="project in projects"
-          :key="project.id"
-          class="project-card"
-          shadow="hover"
-          @click="$router.push(`/project/${project.id}`)"
+      <div v-else class="grid">
+        <div
+          v-for="p in projects"
+          :key="p.id"
+          class="card"
+          @click="$router.push(`/project/${p.id}`)"
         >
-          <div class="card-header">
-            <h3>{{ project.title }}</h3>
-            <el-tag
-              :type="project.status === 'COMPLETED' ? 'success' : project.status === 'PROCESSING' ? 'warning' : 'info'"
-              size="small"
-            >
-              {{ statusMap[project.status] }}
-            </el-tag>
-          </div>
-          <div class="card-info">
-            <span>{{ project.chapterCount }} 章</span>
-            <span>{{ formatDate(project.updatedAt) }}</span>
+          <div class="card-status" :class="p.status.toLowerCase()"></div>
+          <div class="card-body">
+            <div class="card-top">
+              <h3>{{ p.title }}</h3>
+              <el-tag :type="p.status==='COMPLETED'?'success':p.status==='PROCESSING'?'warning':'info'" size="small" round>
+                {{ {DRAFT:'草稿',PROCESSING:'处理中',COMPLETED:'已完成'}[p.status] }}
+              </el-tag>
+            </div>
+            <div class="card-info">
+              <span>{{ p.chapterCount }} 章</span>
+              <span>{{ fmt(p.updatedAt) }}</span>
+            </div>
           </div>
           <div class="card-actions" @click.stop>
-            <el-button size="small" @click="$router.push(`/project/${project.id}`)">打开</el-button>
-            <el-popconfirm title="确定删除？" @confirm="handleDelete(project.id)">
-              <template #reference>
-                <el-button size="small" type="danger" plain>删除</el-button>
-              </template>
-            </el-popconfirm>
+            <el-button size="small" @click="$router.push(`/project/${p.id}`)">打开</el-button>
+            <el-popconfirm title="确定删除？" @confirm="del(p.id)"><template #ref><el-button size="small" type="danger" plain>删除</el-button></template></el-popconfirm>
           </div>
-        </el-card>
+        </div>
       </div>
     </main>
 
-    <el-dialog v-model="showCreate" title="新建项目" width="600px" :close-on-click-modal="false">
-      <el-form :model="form" :rules="rules" ref="formRef" label-position="top">
+    <el-dialog v-model="showCreate" title="新建项目" width="620px" :close-on-click-modal="false">
+      <el-form :model="form" :rules="rules" ref="fr" label-position="top">
         <el-form-item label="项目名称" prop="title">
-          <el-input v-model="form.title" placeholder="如：《三体》改编剧本" />
+          <el-input v-model="form.title" placeholder="如：《三体》改编剧本" size="large" />
         </el-form-item>
         <el-form-item label="小说原文" prop="originalText">
-          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-            <el-upload
-              :auto-upload="false"
-              :show-file-list="false"
-              accept=".txt,.epub,.docx"
-              :on-change="handleFileChange"
-            >
-              <el-button size="small">上传文件 (txt/epub/docx)</el-button>
+          <div class="upload-row">
+            <el-upload :auto-upload="false" :show-file-list="false" accept=".txt,.epub,.docx" :on-change="onFile" drag>
+              <div class="drop-zone">
+                <span style="font-size:24px">📁</span>
+                <p>拖拽或点击上传<br><small>txt / epub / docx</small></p>
+              </div>
             </el-upload>
-            <span v-if="uploading" style="color: #909399; font-size: 13px; line-height: 32px;">解析中...</span>
+            <span v-if="uploading" style="color:var(--color-text-muted)">解析中...</span>
           </div>
-          <el-input
-            v-model="form.originalText"
-            type="textarea"
-            placeholder="粘贴小说原文，或上传文件自动填充..."
-            :rows="14"
-          />
+          <el-input v-model="form.originalText" type="textarea" placeholder="粘贴小说原文，或上传文件..." :rows="12" style="margin-top:8px" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="handleCreate">创建项目</el-button>
+        <el-button type="primary" :loading="creating" @click="create">创建</el-button>
       </template>
     </el-dialog>
   </div>
@@ -97,155 +86,102 @@ const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
 const uploading = ref(false)
-const formRef = ref(null)
+const fr = ref(null)
+const darkMode = ref(false)
 const nickname = ref(localStorage.getItem('nickname') || '用户')
 
 const form = reactive({ title: '', originalText: '' })
 const rules = {
   title: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
-  originalText: [{ required: true, message: '请粘贴小说原文', trigger: 'blur' }]
+  originalText: [{ required: true, message: '请粘贴原文或上传文件', trigger: 'blur' }]
 }
 
-const statusMap = { DRAFT: '草稿', PROCESSING: '处理中', COMPLETED: '已完成' }
+onMounted(async () => {
+  darkMode.value = document.documentElement.classList.contains('dark')
+  await load()
+})
 
-onMounted(() => fetchProjects())
-
-async function fetchProjects() {
+async function load() {
   loading.value = true
-  try {
-    const res = await listProjects()
-    projects.value = res.data.data || []
-  } catch { projects.value = [] } finally { loading.value = false }
+  try { projects.value = (await listProjects()).data.data || [] } catch {}
+  finally { loading.value = false }
 }
 
-async function handleCreate() {
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
+async function create() {
+  if (!await fr.value.validate().catch(() => false)) return
   creating.value = true
   try {
-    const res = await createProject(form.title, form.originalText)
+    const r = await createProject(form.title, form.originalText)
     ElMessage.success('创建成功')
     showCreate.value = false
     form.title = ''; form.originalText = ''
-    router.push(`/project/${res.data.data.id}`)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.message || '创建失败')
-  } finally { creating.value = false }
+    router.push(`/project/${r.data.data.id}`)
+  } catch (e) { ElMessage.error(e.response?.data?.message || '创建失败') }
+  finally { creating.value = false }
 }
 
-async function handleDelete(id) {
-  try {
-    await deleteProject(id)
-    ElMessage.success('已删除')
-    fetchProjects()
-  } catch { ElMessage.error('删除失败') }
+async function del(id) {
+  try { await deleteProject(id); ElMessage.success('已删除'); load() }
+  catch { ElMessage.error('删除失败') }
 }
 
-async function handleFileChange(file) {
+async function onFile(file) {
   uploading.value = true
   try {
-    const res = await uploadFile(file.raw)
-    const text = res.data.data.text
-    form.originalText = text
-    if (!form.title && res.data.data.filename) {
-      form.title = res.data.data.filename.replace(/\.[^.]+$/, '') + ' 改编'
+    const r = await uploadFile(file.raw)
+    form.originalText = r.data.data.text
+    if (!form.title && r.data.data.filename) {
+      form.title = r.data.data.filename.replace(/\.[^.]+$/, '') + ' 改编'
     }
-    ElMessage.success('文件解析成功')
-  } catch (e) {
-    ElMessage.error(e.response?.data?.message || '解析失败')
-  } finally { uploading.value = false }
+    ElMessage.success('解析成功')
+  } catch (e) { ElMessage.error(e.response?.data?.message || '解析失败') }
+  finally { uploading.value = false }
 }
 
-function handleLogout() {
-  localStorage.clear()
-  router.push('/login')
+function toggleDark(v) {
+  document.documentElement.classList.toggle('dark', v)
+  localStorage.setItem('dark', v ? '1' : '0')
 }
 
-function formatDate(d) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('zh-CN')
-}
+function logout() { localStorage.clear(); router.push('/login') }
+function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 </script>
 
 <style scoped>
-.project-list-page {
-  min-height: 100vh;
-  background: #f5f7fa;
-}
+.app { min-height: 100vh; background: var(--color-bg); }
 .navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 56px;
-  padding: 0 24px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  display: flex; justify-content: space-between; align-items: center; height: 52px;
+  padding: 0 24px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
-.navbar-left h1 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0;
+.nav-left h1 { font-size: 18px; font-weight: 700; color: var(--color-text); margin: 0; }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.user { color: var(--color-text-secondary); font-size: 14px; }
+.content { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.page-header h2 { font-size: 22px; font-weight: 700; color: var(--color-text); margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.card {
+  background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-border);
+  overflow: hidden; cursor: pointer; transition: all var(--transition);
 }
-.navbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.navbar-user {
-  color: #606266;
-  font-size: 14px;
-}
-.content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-}
-.content-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-.content-header h2 {
-  font-size: 20px;
-  color: #303133;
-  margin: 0;
-  font-weight: 600;
-}
-.project-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-.project-card {
-  cursor: pointer;
-}
-.project-card:hover {
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.card-header h3 {
-  font-size: 16px;
-  color: #303133;
-  margin: 0;
-}
-.card-info {
-  display: flex;
-  justify-content: space-between;
-  color: #909399;
-  font-size: 13px;
-  margin: 12px 0;
-}
+.card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.card-status { height: 3px; }
+.card-status.completed { background: var(--color-success); }
+.card-status.processing { background: var(--color-warning); }
+.card-status.draft { background: var(--color-primary); }
+.card-body { padding: 16px 20px; }
+.card-top { display: flex; justify-content: space-between; align-items: center; }
+.card-top h3 { font-size: 15px; color: var(--color-text); margin: 0; font-weight: 600; }
+.card-info { display: flex; justify-content: space-between; color: var(--color-text-muted); font-size: 12px; margin-top: 10px; }
 .card-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #ebeef5;
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 20px; border-top: 1px solid var(--color-border-light);
 }
+.drop-zone {
+  text-align: center; padding: 16px; border: 2px dashed var(--color-border);
+  border-radius: var(--radius); cursor: pointer; transition: border-color var(--transition);
+}
+.drop-zone:hover { border-color: var(--color-primary); }
+.drop-zone p { margin: 8px 0 0; color: var(--color-text-muted); font-size: 13px; }
+.drop-zone small { color: var(--color-text-muted); font-size: 11px; }
 </style>

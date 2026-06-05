@@ -15,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,9 +38,7 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProjectResponse>>> list(Authentication auth) {
         List<Project> projects = projectService.listUserProjects(getUserId(auth));
-        List<ProjectResponse> response = projects.stream()
-                .map(ProjectResponse::from)
-                .toList();
+        List<ProjectResponse> response = projects.stream().map(ProjectResponse::from).toList();
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -50,12 +49,11 @@ public class ProjectController {
             if (!project.getUserId().equals(getUserId(auth))) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
             }
-            // Include full text in detail view
             ProjectResponse pr = ProjectResponse.from(project);
-            return ResponseEntity.ok(ApiResponse.success(Map.of(
-                    "project", pr,
-                    "originalText", project.getOriginalText()
-            )));
+            Map<String, Object> data = new HashMap<>();
+            data.put("project", pr);
+            data.put("originalText", project.getOriginalText());
+            return ResponseEntity.ok(ApiResponse.success(data));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }
@@ -65,8 +63,28 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<?>> create(@Valid @RequestBody CreateProjectRequest request,
                                                   Authentication auth) {
         try {
-            Project project = projectService.createProject(
-                    getUserId(auth), request.getTitle(), request.getOriginalText());
+            Project project = projectService.createProject(getUserId(auth), request.getTitle(), request.getOriginalText());
+            return ResponseEntity.ok(ApiResponse.success(ProjectResponse.from(project)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/rename")
+    public ResponseEntity<ApiResponse<?>> rename(@PathVariable Long id,
+                                                  @RequestBody Map<String, String> body,
+                                                  Authentication auth) {
+        try {
+            Project project = projectService.getProject(id);
+            if (!project.getUserId().equals(getUserId(auth))) {
+                return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
+            }
+            String newTitle = body.get("title");
+            if (newTitle == null || newTitle.isBlank()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error(400, "标题不能为空"));
+            }
+            project.setTitle(newTitle);
+            project = projectService.updateProject(project);
             return ResponseEntity.ok(ApiResponse.success(ProjectResponse.from(project)));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
@@ -87,9 +105,6 @@ public class ProjectController {
         }
     }
 
-    /**
-     * Split text into chapters for preview (without calling AI)
-     */
     @PostMapping("/{id}/split")
     public ResponseEntity<ApiResponse<?>> splitChapters(@PathVariable Long id, Authentication auth) {
         try {
@@ -97,31 +112,21 @@ public class ProjectController {
             if (!project.getUserId().equals(getUserId(auth))) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
             }
-
             List<ChapterSplitService.ChapterResult> chapters = scriptService.previewChapters(id);
-            List<Map<String, Object>> result = chapters.stream()
-                    .map(c -> {
-                        Map<String, Object> m = new java.util.HashMap<>();
-                        m.put("number", c.number());
-                        m.put("title", c.title());
-                        m.put("wordCount", c.content().length());
-                        m.put("content", c.content());
-                        return m;
-                    })
-                    .toList();
-
-            return ResponseEntity.ok(ApiResponse.success(Map.of(
-                    "totalChapters", chapters.size(),
-                    "chapters", result
-            )));
+            List<Map<String, Object>> result = chapters.stream().map(c -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("number", c.number());
+                m.put("title", c.title());
+                m.put("wordCount", c.content().length());
+                m.put("content", c.content());
+                return m;
+            }).toList();
+            return ResponseEntity.ok(ApiResponse.success(Map.of("totalChapters", chapters.size(), "chapters", result)));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }
     }
 
-    /**
-     * Generate script from the project's novel text
-     */
     @PostMapping("/{id}/generate")
     public ResponseEntity<ApiResponse<?>> generate(@PathVariable Long id, Authentication auth) {
         try {
@@ -136,9 +141,6 @@ public class ProjectController {
         }
     }
 
-    /**
-     * Generate script with SSE streaming progress
-     */
     @GetMapping(value = "/{id}/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter generateStream(@PathVariable Long id, Authentication auth) {
         return scriptService.generateScriptStream(id, getUserId(auth));

@@ -32,7 +32,11 @@ public class ProjectService {
 
     @Transactional
     public Project createProject(Long userId, String title, String originalText) {
-        Project project = new Project(userId, title, originalText);
+        return projectRepository.save(new Project(userId, title, originalText));
+    }
+
+    @Transactional
+    public Project updateProject(Project project) {
         return projectRepository.save(project);
     }
 
@@ -65,22 +69,17 @@ public class ProjectService {
         projectRepository.deleteById(id);
     }
 
-    // Script version management
     public List<ScriptVersion> listScriptVersions(Long projectId) {
         return scriptVersionRepository.findByProjectIdOrderByVersionNumberDesc(projectId);
     }
 
     public ScriptVersion getLatestScriptVersion(Long projectId) {
-        return scriptVersionRepository.findTopByProjectIdOrderByVersionNumberDesc(projectId)
-                .orElse(null);
+        return scriptVersionRepository.findTopByProjectIdOrderByVersionNumberDesc(projectId).orElse(null);
     }
 
     @Transactional
     public ScriptVersion saveScriptVersion(Long projectId, String yamlContent) {
-        long count = scriptVersionRepository.countByProjectId(projectId);
-        int versionNumber = (int) count + 1;
-
-        ScriptVersion version = new ScriptVersion(projectId, versionNumber, yamlContent);
-        return scriptVersionRepository.save(version);
+        int versionNumber = (int) (scriptVersionRepository.countByProjectId(projectId) + 1);
+        return scriptVersionRepository.save(new ScriptVersion(projectId, versionNumber, yamlContent));
     }
 }

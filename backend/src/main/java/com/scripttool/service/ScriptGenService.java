@@ -4,9 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scripttool.config.DeepSeekConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -15,6 +18,9 @@ import java.util.Map;
 
 @Service
 public class ScriptGenService {
+
+    private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
+    private static final int MAX_RETRIES = 2;
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
@@ -37,34 +43,8 @@ public class ScriptGenService {
 
 请严格按以下 JSON Schema 返回（不要包含任何其他文字）：
 {
-  "characters": [
-    {
-      "name": "角色名",
-      "role": "protagonist|antagonist|supporting|minor",
-      "description": "外貌与性格描述",
-      "traits": ["特长", "性格"]
-    }
-  ],
-  "scenes": [
-    {
-      "chapter": 1,
-      "scene_number": 1,
-      "type": "INT|EXT|INT/EXT",
-      "location": "地点描述",
-      "time": "时间描述",
-      "description": "场景氛围与环境描写",
-      "characters": ["出场角色名"],
-      "beats": [
-        {
-          "type": "action|dialogue|monologue|narration|transition",
-          "character": "角色名 或 null",
-          "line": "对白内容 或 null",
-          "direction": "表演指导/动作说明",
-          "emotion": "情绪"
-        }
-      ]
-    }
-  ]
+  "characters": [...],
+  "scenes": [...]
 }""";
 
     public ScriptGenService(DeepSeekConfig config, RestTemplate restTemplate, ObjectMapper objectMapper) {
@@ -73,77 +53,59 @@ public class ScriptGenService {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * Generate a complete script for all chapters
-     */
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        // Step 1: Extract all characters from full text
         List<Map<String, Object>> allCharacters = extractCharacters(fullText, chapters.get(0).number());
-
-        // Step 2: For each chapter, generate scenes
         List<Map<String, Object>> allScenes = new ArrayList<>();
         for (ChapterSplitService.ChapterResult chapter : chapters) {
-            List<Map<String, Object>> chapterScenes = generateScenes(
-                    chapter.content(), chapter.number(), allCharacters);
-            allScenes.addAll(chapterScenes);
+            allScenes.addAll(generateScenes(chapter.content(), chapter.number(), allCharacters));
         }
-
         return new ScriptResult(allCharacters, allScenes);
     }
 
-    /**
-     * Extract characters from the first chapter (or full text)
-     */
     private List<Map<String, Object>> extractCharacters(String text, int chapterNum) {
-        String userPrompt = String.format(
-                "请提取以下小说文本中的全部角色信息（第%d章）：\n\n%s", chapterNum, text);
-
-        String response = callDeepSeek(userPrompt);
+        String prompt = String.format("请提取以下小说文本中的全部角色信息（第%d章）：\n\n%s", chapterNum, text);
+        String response = callWithRetry(prompt);
         Map<String, Object> result = parseJsonResponse(response);
-
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> characters = (List<Map<String, Object>>) result.getOrDefault("characters", List.of());
-        return characters;
+        List<Map<String, Object>> chars = (List<Map<String, Object>>) result.getOrDefault("characters", List.of());
+        return chars;
     }
 
-    /**
-     * Generate scenes for a single chapter
-     */
-    private List<Map<String, Object>> generateScenes(String chapterText, int chapterNum,
-                                                      List<Map<String, Object>> knownCharacters) {
-        String charactersHint = buildCharactersHint(knownCharacters);
-        String userPrompt = String.format(
-                "请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s",
-                chapterNum, charactersHint, chapterText);
-
-        String response = callDeepSeek(userPrompt);
+    private List<Map<String, Object>> generateScenes(String text, int chapterNum, List<Map<String, Object>> chars) {
+        String hint = chars.isEmpty() ? "暂无" : chars.stream().map(c -> c.get("name").toString()).reduce((a, b) -> a + ", " + b).orElse("暂无");
+        String prompt = String.format("请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s", chapterNum, hint, text);
+        String response = callWithRetry(prompt);
         Map<String, Object> result = parseJsonResponse(response);
-
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> scenes = (List<Map<String, Object>>) result.getOrDefault("scenes", List.of());
-
-        // Ensure chapter number is set
         for (Map<String, Object> scene : scenes) {
             scene.putIfAbsent("chapter", chapterNum);
         }
-
         return scenes;
     }
 
-    private String buildCharactersHint(List<Map<String, Object>> characters) {
-        if (characters.isEmpty()) return "暂无";
-        StringBuilder sb = new StringBuilder();
-        for (Map<String, Object> c : characters) {
-            sb.append(c.get("name")).append("(").append(c.get("role")).append("), ");
+    private String callWithRetry(String userPrompt) {
+        Exception lastEx = null;
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                if (attempt > 0) {
+                    log.info("Retry attempt {} for DeepSeek API call", attempt);
+                    Thread.sleep(1000L * attempt);
+                }
+                return callDeepSeek(userPrompt);
+            } catch (RestClientException e) {
+                lastEx = e;
+                log.warn("DeepSeek API call failed (attempt {}): {}", attempt + 1, e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted", e);
+            }
         }
-        return sb.substring(0, Math.max(0, sb.length() - 2));
+        throw new RuntimeException("AI 调用失败，已重试 " + MAX_RETRIES + " 次", lastEx);
     }
 
-    /**
-     * Call DeepSeek API
-     */
     private String callDeepSeek(String userPrompt) {
-        Map<String, Object> requestBody = Map.of(
+        Map<String, Object> body = Map.of(
                 "model", config.getModel(),
                 "messages", List.of(
                         Map.of("role", "system", "content", SYSTEM_PROMPT),
@@ -155,38 +117,29 @@ public class ScriptGenService {
         );
 
         HttpHeaders headers = config.createHeaders();
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         String response = restTemplate.postForObject(config.getApiUrl(), entity, String.class);
 
         try {
             JsonNode root = objectMapper.readTree(response);
             return root.path("choices").get(0).path("message").path("content").asText();
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse DeepSeek API response", e);
+            throw new RuntimeException("Failed to parse API response", e);
         }
     }
 
-    /**
-     * Parse JSON from DeepSeek response string
-     */
     private Map<String, Object> parseJsonResponse(String jsonStr) {
         try {
-            // Clean potential markdown code blocks
             String cleaned = jsonStr.trim();
             if (cleaned.startsWith("```")) {
-                int startIdx = cleaned.indexOf('\n');
-                int endIdx = cleaned.lastIndexOf("```");
-                if (startIdx > 0 && endIdx > startIdx) {
-                    cleaned = cleaned.substring(startIdx + 1, endIdx).trim();
-                }
+                int start = cleaned.indexOf('\n'), end = cleaned.lastIndexOf("```");
+                if (start > 0 && end > start) cleaned = cleaned.substring(start + 1, end).trim();
             }
-
             @SuppressWarnings("unchecked")
             Map<String, Object> result = objectMapper.readValue(cleaned, Map.class);
             return result;
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse AI response as JSON: " + jsonStr.substring(0, Math.min(200, jsonStr.length())), e);
+            throw new RuntimeException("Failed to parse AI response: " + jsonStr.substring(0, Math.min(200, jsonStr.length())), e);
         }
     }
 
