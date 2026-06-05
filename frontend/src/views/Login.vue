@@ -4,7 +4,8 @@
       <div class="brand">
         <div class="brand-icon">🎬</div>
         <h1>小说转剧本</h1>
-        <p>AI 辅助剧本改编工具</p>
+        <p class="slogan">从文字到银幕，只差一个回车</p>
+        <p class="sub">AI 辅助剧本改编工具</p>
       </div>
 
       <el-tabs v-model="tab" stretch>
@@ -97,5 +98,6 @@ async function register() {
 .brand { text-align: center; margin-bottom: 24px; }
 .brand-icon { font-size: 40px; margin-bottom: 8px; }
 .brand h1 { font-size: 22px; font-weight: 700; color: var(--color-text); margin: 0 0 4px; }
-.brand p { font-size: 14px; color: var(--color-text-muted); margin: 0; }
+.slogan { font-size: 16px; color: var(--color-primary); font-weight: 600; margin: 4px 0; font-style: italic; letter-spacing: 2px; }
+.brand p.sub { font-size: 13px; color: var(--color-text-muted); margin: 4px 0 0; }
 </style>

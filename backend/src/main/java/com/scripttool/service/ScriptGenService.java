@@ -15,16 +15,20 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
+    private static final int PARALLEL_CHAPTERS = 3;
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final ExecutorService executor = Executors.newFixedThreadPool(PARALLEL_CHAPTERS);
 
     private static final String SYSTEM_PROMPT = """
 你是一个专业的剧本改编助手。你需要将小说章节转换为结构化的剧本格式。
@@ -34,14 +38,14 @@ public class ScriptGenService {
 2. role 取值为: protagonist(主角), antagonist(反派), supporting(配角), minor(次要)
 3. scene type 取值为: INT(室内), EXT(室外), INT/EXT(内外交替)
 4. beat type 取值为: action(动作/场景描写), dialogue(对白), monologue(独白/内心), narration(旁白), transition(转场)
-5. character 字段仅在 beat type 为 dialogue 或 monologue 时需要填写，action/narration/transition 时为 null
+5. character 字段仅在 beat type 为 dialogue 或 monologue 时需要填写
 6. direction 是表演指导/舞台说明，用中文写
 7. emotion 是该 beat 的角色情绪
-8. 保留原文的关键对白和重要情节，不要遗漏重要对话
+8. 保留原文的关键对白和重要情节
 9. 根据上下文推测场景地点和时间，无法判断时标注"未知"
 10. 务必返回有效的 JSON，不要包含 markdown 代码块标记
 
-请严格按以下 JSON Schema 返回（不要包含任何其他文字）：
+严格按以下 JSON Schema 返回：
 {
   "characters": [...],
   "scenes": [...]
@@ -54,11 +58,47 @@ public class ScriptGenService {
     }
 
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        List<Map<String, Object>> allCharacters = extractCharacters(fullText, chapters.get(0).number());
-        List<Map<String, Object>> allScenes = new ArrayList<>();
+        // Step 1: Extract characters from first chapter only (faster)
+        List<Map<String, Object>> allCharacters = extractCharacters(
+                chapters.get(0).content(), chapters.get(0).number());
+
+        // Step 2: Process chapters in parallel batches
+        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
+        AtomicInteger counter = new AtomicInteger(0);
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (ChapterSplitService.ChapterResult chapter : chapters) {
-            allScenes.addAll(generateScenes(chapter.content(), chapter.number(), allCharacters));
+            futures.add(CompletableFuture.runAsync(() -> {
+                List<Map<String, Object>> scenes = generateScenes(
+                        chapter.content(), chapter.number(), allCharacters);
+                // Preserve chapter order
+                int idx = counter.getAndIncrement();
+                synchronized (allScenes) {
+                    // Insert at approximate position (sorted later)
+                    allScenes.addAll(scenes);
+                }
+                log.info("Chapter {} done ({} scenes)", chapter.number(), scenes.size());
+            }, executor));
         }
+
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("Parallel chapter processing failed", e);
+            throw new RuntimeException("章节处理超时或失败", e);
+        }
+
+        // Sort scenes by chapter number
+        allScenes.sort((a, b) -> {
+            int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
+            int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
+            if (ca != cb) return ca - cb;
+            int sa = ((Number) a.getOrDefault("scene_number", 0)).intValue();
+            int sb = ((Number) b.getOrDefault("scene_number", 0)).intValue();
+            return sa - sb;
+        });
+
         return new ScriptResult(allCharacters, allScenes);
     }
 
@@ -72,8 +112,12 @@ public class ScriptGenService {
     }
 
     private List<Map<String, Object>> generateScenes(String text, int chapterNum, List<Map<String, Object>> chars) {
-        String hint = chars.isEmpty() ? "暂无" : chars.stream().map(c -> c.get("name").toString()).reduce((a, b) -> a + ", " + b).orElse("暂无");
-        String prompt = String.format("请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s", chapterNum, hint, text);
+        String hint = chars.isEmpty() ? "暂无" : chars.stream()
+                .map(c -> c.get("name").toString())
+                .reduce((a, b) -> a + ", " + b).orElse("暂无");
+        String prompt = String.format(
+                "请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s",
+                chapterNum, hint, text);
         String response = callWithRetry(prompt);
         Map<String, Object> result = parseJsonResponse(response);
         @SuppressWarnings("unchecked")
@@ -89,13 +133,13 @@ public class ScriptGenService {
         for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
                 if (attempt > 0) {
-                    log.info("Retry attempt {} for DeepSeek API call", attempt);
+                    log.info("Retry {} for DeepSeek API", attempt);
                     Thread.sleep(1000L * attempt);
                 }
                 return callDeepSeek(userPrompt);
             } catch (RestClientException e) {
                 lastEx = e;
-                log.warn("DeepSeek API call failed (attempt {}): {}", attempt + 1, e.getMessage());
+                log.warn("API call failed (attempt {}): {}", attempt + 1, e.getMessage());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted", e);
@@ -139,7 +183,8 @@ public class ScriptGenService {
             Map<String, Object> result = objectMapper.readValue(cleaned, Map.class);
             return result;
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to parse AI response: " + jsonStr.substring(0, Math.min(200, jsonStr.length())), e);
+            throw new RuntimeException("Failed to parse AI response: " +
+                    jsonStr.substring(0, Math.min(200, jsonStr.length())), e);
         }
     }
 

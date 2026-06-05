@@ -34,15 +34,12 @@ public class ChatService {
 
     @Transactional
     public ChatResponse chat(Long projectId, Long userId, String userMessage) {
-        // Load or create conversation
         Conversation conv = convRepo.findTopByProjectIdOrderByCreatedAtDesc(projectId)
                 .orElseGet(() -> convRepo.save(new Conversation(projectId, userId)));
 
-        // Get current script for context
         ScriptVersion script = projectService.getLatestScriptVersion(projectId);
         String scriptContext = script != null ? script.getYamlContent() : "";
 
-        // Build messages for AI
         List<Map<String, String>> aiMessages = new ArrayList<>();
         aiMessages.add(Map.of("role", "system", "content", buildSystemPrompt(scriptContext)));
         for (Message m : conv.getMessages()) {
@@ -50,8 +47,7 @@ public class ChatService {
         }
         aiMessages.add(Map.of("role", "user", "content", userMessage));
 
-        // Call DeepSeek
-        Map<String, Object> requestBody = Map.of(
+        Map<String, Object> body = Map.of(
                 "model", config.getModel(),
                 "messages", aiMessages,
                 "max_tokens", config.getMaxTokens(),
@@ -60,33 +56,52 @@ public class ChatService {
 
         String response = restTemplate.postForObject(
                 config.getApiUrl(),
-                new HttpEntity<>(requestBody, config.createHeaders()),
+                new HttpEntity<>(body, config.createHeaders()),
                 String.class
         );
 
         String reply = extractReply(response);
 
-        // Save messages
+        // Extract YAML patch if present
+        String yamlPatch = extractYamlPatch(reply);
+
         conv.getMessages().add(new Message(conv, "user", userMessage));
         conv.getMessages().add(new Message(conv, "assistant", reply));
         convRepo.save(conv);
 
-        return new ChatResponse(reply, conv.getId());
+        return new ChatResponse(reply, conv.getId(), yamlPatch, parseActions(reply));
     }
 
-    private String buildSystemPrompt(String scriptContext) {
+    private String buildSystemPrompt(String scriptContent) {
         return """
-你是一个专业的剧本编辑助手。你可以帮助作者：
-1. 分析剧本结构和节奏
-2. 优化角色对话，使其更自然生动
-3. 提出场景调整建议
-4. 修改和润色具体段落
-5. 回答关于剧本改编的问题
+你是一个专业的剧本编辑助手。你可以：
+1. 分析剧本结构、节奏、角色发展
+2. 优化对话和场景描写
+3. 提出具体的修改建议
 
-当前剧本内容：
-%s
+## YAML 修改格式
+如果你想建议修改剧本 YAML，请使用以下格式：
 
-请用中文回复，给出具体可操作的修改建议。如果用户要求修改剧本，请给出具体的修改后文本。""".formatted(scriptContext);
+```yaml:patch
+# 说明修改原因
+characters:
+  - name: "角色名"
+    # ... (修改后的完整角色块)
+
+scenes:
+  - id: SCENE_001
+    # ... (修改后的完整场景块)
+```
+
+如果只是回答问题或给建议，不要包含 yaml:patch 代码块。
+
+## 写作建议
+- 具体的修改优于笼统的建议
+- 如果用户要看某个角色，直接给出角色信息
+- 如果用户要求改某段台词，给出修改前后的对比
+
+当前剧本：
+%s""".formatted(scriptContent);
     }
 
     private String extractReply(String response) {
@@ -98,11 +113,33 @@ public class ChatService {
         }
     }
 
+    private String extractYamlPatch(String reply) {
+        int start = reply.indexOf("```yaml:patch");
+        if (start < 0) start = reply.indexOf("```yaml");
+        if (start < 0) return null;
+        int contentStart = reply.indexOf('\n', start);
+        int end = reply.indexOf("```", contentStart + 1);
+        if (contentStart > 0 && end > contentStart) {
+            String yaml = reply.substring(contentStart + 1, end).trim();
+            return yaml.replace(":patch", "");
+        }
+        return null;
+    }
+
+    private List<Map<String, String>> parseActions(String reply) {
+        List<Map<String, String>> actions = new ArrayList<>();
+        if (reply.contains("```yaml:patch") || reply.contains("```yaml")) {
+            actions.add(Map.of("label", "应用此修改", "action", "apply_yaml", "style", "primary"));
+            actions.add(Map.of("label", "忽略", "action", "discard", "style", "default"));
+        }
+        return actions;
+    }
+
     public List<Message> getHistory(Long projectId) {
         return convRepo.findTopByProjectIdOrderByCreatedAtDesc(projectId)
                 .map(Conversation::getMessages)
                 .orElse(List.of());
     }
 
-    public record ChatResponse(String reply, Long conversationId) {}
+    public record ChatResponse(String reply, Long conversationId, String yamlPatch, List<Map<String, String>> actions) {}
 }

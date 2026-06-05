@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,10 +33,12 @@ public class ChatController {
             }
 
             ChatService.ChatResponse reply = chatService.chat(projectId, userId, message);
-            return ResponseEntity.ok(ApiResponse.success(Map.of(
-                    "reply", reply.reply(),
-                    "conversationId", reply.conversationId()
-            )));
+            Map<String, Object> data = new HashMap<>();
+            data.put("reply", reply.reply());
+            data.put("conversationId", reply.conversationId());
+            data.put("yamlPatch", reply.yamlPatch());
+            data.put("actions", reply.actions());
+            return ResponseEntity.ok(ApiResponse.success(data));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }

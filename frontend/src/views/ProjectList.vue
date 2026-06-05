@@ -3,6 +3,7 @@
     <header class="navbar">
       <div class="nav-left">
         <h1>🎬 小说转剧本</h1>
+        <span class="nav-slogan">从文字到银幕，只差一个回车</span>
       </div>
       <div class="nav-right">
         <el-switch v-model="darkMode" inline-prompt active-text="🌙" inactive-text="☀️" @change="toggleDark" size="small" />
@@ -153,7 +154,9 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   display: flex; justify-content: space-between; align-items: center; height: 52px;
   padding: 0 24px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
+.nav-left { display: flex; align-items: baseline; gap: 12px; }
 .nav-left h1 { font-size: 18px; font-weight: 700; color: var(--color-text); margin: 0; }
+.nav-slogan { font-size: 12px; color: var(--color-primary); font-style: italic; letter-spacing: 1px; }
 .nav-right { display: flex; align-items: center; gap: 12px; }
 .user { color: var(--color-text-secondary); font-size: 14px; }
 .content { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
