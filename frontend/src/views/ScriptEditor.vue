@@ -84,21 +84,58 @@
           <el-tab-pane label="AI 助手" name="chat">
             <div class="chat">
               <div class="cmsgs" ref="cbx">
-                <div v-for="(m,i) in cmsgs" :key="i" :class="['cm',m.role]">
-                  <!-- Assistant bubble with markdown -->
-                  <div class="cbb" v-html="renderMd(m.content,m.actions)"></div>
-                  <!-- Action buttons -->
-                  <div v-if="m.actions?.length" class="cactions">
-                    <el-button v-for="a in m.actions" :key="a.action" :type="a.style" size="small"
-                      @click="doAction(a,m,i)">{{ a.label }}</el-button>
+                <!-- Welcome hint -->
+                <div v-if="!cmsgs.length" class="chat-welcome">
+                  <div class="cw-avatar">🤖</div>
+                  <p>我是你的剧本编辑助手</p>
+                  <p class="cw-hint">可以帮你优化对话、调整节奏、润色台词<br/>也可以直接让我修改 YAML</p>
+                </div>
+
+                <div v-for="(m,i) in cmsgs" :key="i">
+                  <div :class="['msg-row', m.role]">
+                    <!-- Avatar -->
+                    <div class="msg-avatar" :class="m.role">
+                      {{ m.role === 'user' ? '👤' : '🤖' }}
+                    </div>
+                    <!-- Bubble -->
+                    <div class="msg-body">
+                      <div :class="['bubble', m.role]" v-html="renderMd(m.content)"></div>
+                      <!-- Action buttons for YAML patches -->
+                      <div v-if="m.actions?.length" class="patch-actions">
+                        <el-button
+                          v-for="a in m.actions"
+                          :key="a.action"
+                          :type="a.style"
+                          size="small"
+                          @click="doAction(a, m, i)"
+                          round
+                        >{{ a.label }}</el-button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div v-if="cw" class="cm assistant"><div class="cbb ty">思考中...</div></div>
+
+                <!-- Typing indicator -->
+                <div v-if="cw" class="msg-row assistant">
+                  <div class="msg-avatar assistant">🤖</div>
+                  <div class="msg-body">
+                    <div class="bubble assistant typing-bubble">
+                      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="ci">
-                <el-input v-model="ci" placeholder="输入修改建议或问题..." @keyup.enter="snd" :disabled="cw" size="small">
-                  <template #append><el-button @click="snd" :loading="cw" size="small">发送</el-button></template>
-                </el-input>
+
+              <div class="chat-input-bar">
+                <el-input
+                  v-model="ci"
+                  placeholder="输入修改建议或问题，回车发送..."
+                  @keyup.enter="snd"
+                  :disabled="cw"
+                  size="default"
+                  class="chat-input"
+                />
+                <el-button type="primary" @click="snd" :loading="cw" :icon="'Promotion'" size="default" circle />
               </div>
             </div>
           </el-tab-pane>
@@ -313,20 +350,52 @@ function doAction(a,msg,i){
 }
 
 // Markdown rendering
-function renderMd(t,actions){
+function renderMd(t){
   if(!t)return''
   let h = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-  h = h.replace(/```yaml:patch([\s\S]*?)```/g,'<div class="patch-block"><div class="patch-label">📝 建议修改的 YAML</div><pre><code>$1</code></pre></div>')
-  h = h.replace(/```yaml([\s\S]*?)```/g,'<pre><code>$1</code></pre>')
-  h = h.replace(/```(\w*)([\s\S]*?)```/g,'<pre><code>$2</code></pre>')
-  h = h.replace(/`([^`]+)`/g,'<code style="background:var(--color-bg-alt);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>')
-  h = h.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
-  h = h.replace(/\*([^*]+)\*/g,'<em>$1</em>')
-  h = h.replace(/\n/g,'<br>')
-  // Highlight YAML blocks with hljs
-  h = h.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g,(_,c)=>{
-    try{return'<pre><code>'+hljs.highlight(c,{language:'yaml'}).value+'</code></pre>'}catch{return'<pre><code>'+c+'</code></pre>'}
+
+  // Code blocks first (before other transformations)
+  h = h.replace(/```yaml:patch([\s\S]*?)```/g,'<div class="patch-block"><div class="patch-label">📝 建议修改</div><pre><code>$1</code></pre></div>')
+  h = h.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,lang,code)=>{
+    try{return'<pre><code>'+hljs.highlight(code.trim(),{language:lang||'yaml'}).value+'</code></pre>'}catch{return'<pre><code>'+code.trim()+'</code></pre>'}
   })
+
+  // Headings
+  h = h.replace(/^#### (.+)$/gm,'<h5>$1</h5>')
+  h = h.replace(/^### (.+)$/gm,'<h4>$1</h4>')
+  h = h.replace(/^## (.+)$/gm,'<h3>$1</h3>')
+  h = h.replace(/^# (.+)$/gm,'<h2>$1</h2>')
+
+  // Bold and italic
+  h = h.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+  h = h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+  h = h.replace(/\*(.+?)\*/g,'<em>$1</em>')
+
+  // Inline code
+  h = h.replace(/`([^`]+)`/g,'<code>$1</code>')
+
+  // Unordered lists
+  h = h.replace(/^[\-\*] (.+)$/gm,'<li>$1</li>')
+  h = h.replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>')
+
+  // Ordered lists
+  h = h.replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
+
+  // Horizontal rules
+  h = h.replace(/^---$/gm,'<hr>')
+
+  // Line breaks
+  h = h.replace(/\n\n/g,'</p><p>')
+  h = h.replace(/\n/g,'<br>')
+
+  // Wrap in paragraph
+  h = '<p>'+h+'</p>'
+  h = h.replace(/<p><h([2-5])>/g,'<h$1>').replace(/<\/h([2-5])><\/p>/g,'</h$1>')
+  h = h.replace(/<p><ul>/g,'<ul>').replace(/<\/ul><\/p>/g,'</ul>')
+  h = h.replace(/<p><pre>/g,'<pre>').replace(/<\/pre><\/p>/g,'</pre>')
+  h = h.replace(/<p><div/g,'<div').replace(/\/div><\/p>/g,'/div>')
+  h = h.replace(/<p><\/p>/g,'')
+
   return h
 }
 
@@ -436,20 +505,48 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .rtt :deep(.el-tabs__content){flex:1;overflow:hidden}
 .rtt :deep(.el-tab-pane){height:100%}
 
-/* Chat */
+/* Chat — polished */
 .chat{height:100%;display:flex;flex-direction:column}
-.cmsgs{flex:1;overflow:auto;padding:8px}
-.cm{margin-bottom:8px}
-.cm.user .cbb{background:var(--color-primary);color:#fff;border-radius:12px 12px 4px 12px;padding:8px 12px;margin-left:32px;font-size:13px}
-.cm.assistant .cbb{background:var(--color-bg-alt);color:var(--color-text);border-radius:12px 12px 12px 4px;padding:8px 12px;margin-right:12px;font-size:13px;line-height:1.6}
-.cbb :deep(pre){background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;padding:10px;margin:8px 0;font-size:12px;overflow:auto;max-height:200px}
-.cbb :deep(code){font-family:var(--font-mono);font-size:12px}
-.cbb :deep(.patch-block){border:2px solid var(--color-success);border-radius:8px;margin:8px 0;overflow:hidden}
-.cbb :deep(.patch-label){background:var(--color-success);color:#fff;padding:4px 10px;font-size:11px;font-weight:600}
-.cbb :deep(.patch-block pre){margin:0;border:none;border-radius:0;background:#f0fdf4}
-.ty{color:var(--color-text-muted);font-style:italic}
-.cactions{display:flex;gap:6px;margin-top:6px;margin-left:12px}
-.ci{padding:8px;border-top:1px solid var(--color-border-light)}
+.cmsgs{flex:1;overflow:auto;padding:12px 10px}
+.chat-welcome{text-align:center;padding:24px 12px}
+.cw-avatar{font-size:40px;margin-bottom:8px}
+.chat-welcome p{font-size:13px;color:var(--color-text-secondary);margin:0}
+.cw-hint{font-size:12px!important;color:var(--color-text-muted)!important;margin-top:6px!important;line-height:1.6}
+
+.msg-row{display:flex;gap:8px;margin-bottom:14px;align-items:flex-start}
+.msg-row.user{flex-direction:row-reverse}
+.msg-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.msg-avatar.user{background:var(--c-amber)}.msg-avatar.assistant{background:var(--color-surface-hover)}
+.msg-body{max-width:85%;display:flex;flex-direction:column}
+
+.bubble{padding:10px 14px;font-size:13px;line-height:1.6;word-break:break-word}
+.bubble.user{background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);border-radius:16px 16px 4px 16px}
+.bubble.assistant{background:var(--color-bg-alt);color:var(--color-text);border-radius:16px 16px 16px 4px;border:1px solid var(--color-border-light)}
+.bubble :deep(pre){background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;padding:10px;margin:8px 0;font-size:12px;overflow:auto;max-height:200px}
+.bubble :deep(code){font-family:var(--font-mono);font-size:12px;background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px}
+.bubble.user :deep(code){background:rgba(0,0,0,0.15);color:var(--c-darker)}
+.bubble :deep(.patch-block){border:2px solid var(--color-success);border-radius:8px;margin:8px 0;overflow:hidden}
+.bubble :deep(.patch-label){background:var(--color-success);color:#fff;padding:4px 10px;font-size:11px;font-weight:600}
+.bubble :deep(.patch-block pre){margin:0;border:none;border-radius:0;background:rgba(0,0,0,0.03)}
+.bubble :deep(h1),.bubble :deep(h2),.bubble :deep(h3),.bubble :deep(h4),.bubble :deep(h5){color:var(--c-gold);margin:8px 0 4px;line-height:1.3}
+.bubble :deep(h2){font-size:17px}.bubble :deep(h3){font-size:15px}.bubble :deep(h4){font-size:14px}.bubble :deep(h5){font-size:13px}
+.bubble :deep(strong){color:var(--c-gold-light);font-weight:700}
+.bubble :deep(ul),.bubble :deep(ol){padding-left:16px;margin:4px 0}
+.bubble :deep(li){margin:2px 0;line-height:1.5}
+.bubble :deep(hr){border:none;border-top:1px solid var(--color-border);margin:10px 0}
+.bubble :deep(p){margin:4px 0}
+.bubble.user :deep(h2),.bubble.user :deep(h3),.bubble.user :deep(h4),.bubble.user :deep(strong){color:var(--c-darker)}
+
+/* Typing dots */
+.typing-bubble{display:flex;align-items:center;gap:4px;padding:14px 18px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--color-text-muted);animation:dotBounce 1.4s infinite both}
+.dot:nth-child(2){animation-delay:0.2s}.dot:nth-child(3){animation-delay:0.4s}
+@keyframes dotBounce{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+
+.patch-actions{display:flex;gap:6px;margin-top:6px;padding-left:4px}
+
+.chat-input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--color-border-light);align-items:center}
+.chat-input{flex:1}
 
 /* Characters */
 .chars{padding:8px;overflow:auto;height:100%}
@@ -461,17 +558,29 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ccard p{padding:0 10px;font-size:12px;color:var(--color-text-secondary);margin:0 0 4px}
 .ctraits{display:flex;gap:4px;flex-wrap:wrap;padding:0 10px 8px}
 
-/* Scene images carousel */
-.scenes{padding:8px;overflow:auto;height:100%}
+/* Scene carousel */
+.scenes{padding:10px;overflow:auto;height:100%}
+.scenes :deep(.el-carousel__container){height:200px!important}
+.scenes :deep(.el-carousel__arrow){background:var(--color-surface)!important;color:var(--c-gold)!important}
 .carousel-slide{text-align:center;padding:4px}
 .simgt{font-size:12px;color:var(--color-text-secondary);margin-bottom:6px}
 .simg{width:100%;height:160px;object-fit:cover;border-radius:var(--radius);cursor:pointer}
 .simgplc{width:100%;height:120px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--color-text-muted);cursor:pointer;border-radius:var(--radius);border:2px dashed var(--color-border)}
-.simgplc:hover{background:var(--color-surface-hover);border-color:var(--color-primary)}
+.simgplc:hover{background:var(--color-surface-hover);border-color:var(--c-gold)}
 
 /* Research */
-.research{padding:8px}
-.sres{margin-top:12px;padding:10px;background:var(--color-bg-alt);border-radius:var(--radius);font-size:13px;line-height:1.6;max-height:400px;overflow:auto}
+.research{padding:10px}
+.research :deep(.el-input__wrapper){background:var(--color-bg-alt);border-color:var(--color-border);box-shadow:none}
+.research :deep(.el-input__inner){color:var(--color-text)}
+.research :deep(.el-button--primary){background:var(--c-gold);border-color:var(--c-gold);color:var(--c-darker)}
+.research :deep(.el-button--primary):hover{background:var(--c-gold-light)}
+.sres{margin-top:12px;padding:12px;background:var(--color-bg-alt);border-radius:var(--radius-lg);font-size:13px;line-height:1.7;max-height:400px;overflow:auto;border:1px solid var(--color-border-light)}
+.sres :deep(h1),.sres :deep(h2),.sres :deep(h3),.sres :deep(h4){color:var(--c-gold);margin:12px 0 6px}
+.sres :deep(strong){color:var(--c-gold-light)}
+.sres :deep(code){background:rgba(212,168,83,0.1);padding:2px 6px;border-radius:3px;font-size:12px}
+.sres :deep(ul),.sres :deep(ol){padding-left:18px;margin:6px 0}
+.sres :deep(li){margin:4px 0}
+.sres :deep(hr){border:none;border-top:1px solid var(--color-border);margin:12px 0}
 
 .tgr{position:absolute;right:0;top:50%;transform:translateY(-50%);width:18px;height:40px;border:1px solid var(--color-border);border-right:none;background:var(--color-surface);cursor:pointer;font-size:9px;color:var(--color-text-muted);display:flex;align-items:center;justify-content:center;border-radius:4px 0 0 4px;z-index:10}
 .tgr:hover{background:var(--color-surface-hover)}
