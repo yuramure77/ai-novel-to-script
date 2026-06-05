@@ -229,12 +229,18 @@ onMounted(async () => {
     projectStatus.value = data.project?.status || 'DRAFT'
     originalText.value = data.originalText || ''
 
+    // Load existing script
     const vRes = await getLatest(projectId)
     if (vRes.data.data) {
       latestVersion.value = vRes.data.data
       yamlContent.value = vRes.data.data.yamlContent
     }
-  } catch { ElMessage.error('加载项目失败') }
+
+    // Auto-split on first load
+    if (originalText.value && !chapters.value.length) {
+      await handleSplit()
+    }
+  } catch { /* page will still render */ }
 })
 
 async function handleSplit() {
