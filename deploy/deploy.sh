@@ -22,10 +22,17 @@ sudo cp $JAR_FILE $APP_DIR/app.jar
 
 # 3. Configure Nginx
 echo "[3/6] 配置 Nginx..."
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/novel-script
-sudo sed -i "s/your-domain.com/$DOMAIN/g" /etc/nginx/sites-available/novel-script
-sudo ln -sf /etc/nginx/sites-available/novel-script /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+if [ -d /etc/nginx/sites-available ]; then
+    # Debian/Ubuntu style
+    sudo cp deploy/nginx.conf /etc/nginx/sites-available/novel-script
+    sudo sed -i "s/your-domain.com/$DOMAIN/g" /etc/nginx/sites-available/novel-script
+    sudo ln -sf /etc/nginx/sites-available/novel-script /etc/nginx/sites-enabled/
+elif [ -d /etc/nginx/conf.d ]; then
+    # RHEL/CentOS/OpenCloudOS style
+    sudo cp deploy/nginx.conf /etc/nginx/conf.d/novel-script.conf
+    sudo sed -i "s/your-domain.com/$DOMAIN/g" /etc/nginx/conf.d/novel-script.conf
+fi
+sudo nginx -t && sudo systemctl restart nginx || echo "Nginx warning: check config"
 
 # 4. HTTPS (optional, requires DNS to be pointing)
 if [ "$DOMAIN" != "localhost" ]; then

@@ -68,10 +68,17 @@
           <div><el-button size="small" text @click="edit=!edit">{{edit?'预览':'编辑'}}</el-button>
             <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button></div>
         </div>
+        <!-- YAML chapter index -->
+        <div v-if="yamlChapters.length && !edit" class="yaml-chaps">
+          <button :class="['ychip',{on:yamlChap===0}]" @click="yamlChap=0">全部</button>
+          <button v-for="ch in yamlChapters" :key="ch.num" :class="['ychip',{on:yamlChap===ch.num}]" @click="yamlChap=ch.num">
+            {{ ch.label }} <small>({{ ch.count }}场)</small>
+          </button>
+        </div>
         <div class="cb">
           <div v-if="!yaml&&!gen" class="emp"><el-empty description="点击「生成剧本」开始"/></div>
           <textarea v-else-if="edit" v-model="ey" class="ye" spellcheck="false"></textarea>
-          <div v-else class="yv"><pre v-html="hy"></pre></div>
+          <div v-else class="yv"><pre v-html="hyFiltered"></pre></div>
         </div>
         <div v-if="edit" class="eb"><el-button size="small" @click="edit=false;ey=yaml">取消</el-button>
           <el-button size="small" type="primary" :loading="saveB" @click="svY">保存 (Ctrl+S)</el-button></div>
@@ -227,6 +234,7 @@ const gen = ref(false); const progressMsg = ref('')
 const yaml = ref(''); const latestVersion = ref(null)
 const edit = ref(false); const ey = ref(''); const saveB = ref(false)
 const vers = ref([]); const showHist = ref(false)
+const yamlChap = ref(0); const yamlChapters = ref([])
 
 // Chat
 const cmsgs = ref([]); const ci = ref(''); const cw = ref(false); const cbx = ref(null)
@@ -251,6 +259,42 @@ const renaming = ref(false); const renameTitle = ref(''); const renameRef = ref(
 const stTag = computed(()=>projectStatus.value==='COMPLETED'?'success':projectStatus.value==='PROCESSING'?'warning':'info')
 const stText = computed(()=>({DRAFT:'草稿',PROCESSING:'处理中',COMPLETED:'已完成'})[projectStatus.value]||'')
 const hy = computed(()=>yaml.value?hljs.highlight(yaml.value,{language:'yaml'}).value:'')
+const hyFiltered = computed(()=>{
+  if(!yaml.value||yamlChap.value===0)return hy.value
+  // Extract only the selected chapter's scenes
+  const lines = yaml.value.split('\n')
+  const out = []
+  let inScene = false, currentChapter = 0, headerDone = false
+  for(let i=0;i<lines.length;i++){
+    const l = lines[i]
+    // Copy header (everything before first scene)
+    if(!headerDone){
+      out.push(l)
+      if(l.match(/^scenes:/)) headerDone = true
+      continue
+    }
+    // Track chapter
+    const cm = l.match(/^\s{4}chapter:\s*(\d+)/)
+    if(cm) currentChapter = parseInt(cm[1])
+    // Track scene start
+    if(l.match(/^\s{2}- id: SCENE_/)) inScene = true
+    // Include if in selected chapter
+    if(currentChapter === yamlChap.value) out.push(l)
+    // Stop at next top-level key
+    if(l.match(/^\w/) && headerDone && currentChapter !== yamlChap.value) break
+  }
+  return hljs.highlight(out.join('\n'),{language:'yaml'}).value
+})
+
+// Parse YAML chapter index
+watch(yaml,()=>{
+  const chs = {}; let cur = 0
+  for(const l of yaml.value.split('\n')){
+    const m = l.match(/^\s{4}chapter:\s*(\d+)/)
+    if(m){cur=parseInt(m[1]);chs[cur]=(chs[cur]||0)+1}
+  }
+  yamlChapters.value = Object.entries(chs).map(([n,c])=>({num:parseInt(n),count:c,label:'第'+n+'章'}))
+})
 
 // Parse characters from YAML
 watch(yaml,()=>{
@@ -492,6 +536,14 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .eb{display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--color-border-light);flex-shrink:0}
 .yv pre{font-family:var(--font-mono);font-size:13px;line-height:1.6;margin:0}
 .yv code{white-space:pre-wrap}
+
+/* YAML chapter chips */
+.yaml-chaps{display:flex;gap:4px;padding:6px 10px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid var(--color-border-light)}
+.ychip{flex-shrink:0;padding:3px 10px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);font-size:11px;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;transition:all var(--transition)}
+.ychip:hover{color:var(--c-gold);border-color:var(--c-gold)}
+.ychip.on{background:var(--c-gold);color:var(--c-darker);border-color:var(--c-gold);font-weight:700}
+.ychip small{font-weight:400;opacity:0.7}
+
 /* Override highlight.js blue → gold */
 .yv :deep(.hljs-string){color:#e6c874}
 .yv :deep(.hljs-attr){color:#d4a853}
