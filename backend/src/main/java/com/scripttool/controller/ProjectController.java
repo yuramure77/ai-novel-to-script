@@ -98,11 +98,14 @@ public class ProjectController {
 
             List<ChapterSplitService.ChapterResult> chapters = scriptService.previewChapters(id);
             List<Map<String, Object>> result = chapters.stream()
-                    .map(c -> Map.<String, Object>of(
-                            "number", c.number(),
-                            "title", c.title(),
-                            "wordCount", c.content().length()
-                    ))
+                    .map(c -> {
+                        Map<String, Object> m = new java.util.HashMap<>();
+                        m.put("number", c.number());
+                        m.put("title", c.title());
+                        m.put("wordCount", c.content().length());
+                        m.put("content", c.content());
+                        return m;
+                    })
                     .toList();
 
             return ResponseEntity.ok(ApiResponse.success(Map.of(
