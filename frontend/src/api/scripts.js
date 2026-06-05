@@ -11,3 +11,7 @@ export function getLatest(projectId) {
 export function getYamlUrl(versionId) {
   return `/api/scripts/${versionId}/yaml`
 }
+
+export function saveEditedYaml(projectId, yamlContent) {
+  return api.post(`/scripts/project/${projectId}/save`, { yamlContent })
+}

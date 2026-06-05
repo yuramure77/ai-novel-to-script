@@ -7,7 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -34,53 +36,28 @@ public class ScriptService {
         this.userService = userService;
     }
 
-    /**
-     * Execute the full pipeline: split → analyze → generate YAML
-     */
     @Transactional
     public ScriptVersion generateScript(Long projectId, Long userId) {
         Project project = projectService.getProject(projectId);
-
-        // Verify ownership
-        if (!project.getUserId().equals(userId)) {
-            throw new RuntimeException("无权操作此项目");
-        }
-
+        if (!project.getUserId().equals(userId)) throw new RuntimeException("无权操作此项目");
         projectService.updateStatus(projectId, Project.ProjectStatus.PROCESSING);
 
         try {
-            // Step 1: Split chapters
-            List<ChapterSplitService.ChapterResult> chapters =
-                    chapterSplitService.split(project.getOriginalText());
-
-            if (chapters.isEmpty()) {
-                throw new RuntimeException("未能识别出章节，请检查文本格式");
-            }
+            List<ChapterSplitService.ChapterResult> chapters = chapterSplitService.split(project.getOriginalText());
+            if (chapters.isEmpty()) throw new RuntimeException("未能识别出章节");
 
             projectService.updateChapterCount(projectId, chapters.size());
 
-            // Step 2: AI generation
-            ScriptGenService.ScriptResult result =
-                    scriptGenService.generateScript(project.getOriginalText(), chapters);
-
-            // Step 3: Get user info for author field
+            ScriptGenService.ScriptResult result = scriptGenService.generateScript(project.getOriginalText(), chapters);
             User user = userService.getById(userId);
 
-            // Step 4: Generate YAML
             String yaml = yamlGeneratorService.generate(
-                    project.getTitle(),
-                    "原著小说",
+                    project.getTitle(), "原著小说",
                     user.getNickname() != null ? user.getNickname() : user.getUsername(),
-                    result.characters(),
-                    result.scenes()
-            );
+                    result.characters(), result.scenes());
 
-            // Step 5: Save script version
             ScriptVersion version = projectService.saveScriptVersion(projectId, yaml);
-
-            // Step 6: Mark project as completed
             projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
-
             return version;
 
         } catch (Exception e) {
@@ -91,10 +68,83 @@ public class ScriptService {
     }
 
     /**
-     * Preview the split result (without calling AI)
+     * Generate with SSE streaming progress
      */
+    public SseEmitter generateScriptStream(Long projectId, Long userId) {
+        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+
+        new Thread(() -> {
+            try {
+                Project project = projectService.getProject(projectId);
+                if (!project.getUserId().equals(userId)) {
+                    send(emitter, "error", "无权操作此项目");
+                    emitter.complete();
+                    return;
+                }
+
+                projectService.updateStatus(projectId, Project.ProjectStatus.PROCESSING);
+                send(emitter, "progress", Map.of("step", "split", "message", "正在分章..."));
+
+                List<ChapterSplitService.ChapterResult> chapters = chapterSplitService.split(project.getOriginalText());
+                if (chapters.isEmpty()) {
+                    send(emitter, "error", "未能识别出章节");
+                    emitter.complete();
+                    return;
+                }
+
+                projectService.updateChapterCount(projectId, chapters.size());
+                send(emitter, "progress", Map.of("step", "split", "message", "识别到 " + chapters.size() + " 个章节", "totalChapters", chapters.size()));
+
+                // Extract characters first
+                send(emitter, "progress", Map.of("step", "characters", "message", "正在提取角色信息..."));
+
+                ScriptGenService.ScriptResult result = scriptGenService.generateScript(project.getOriginalText(), chapters);
+
+                int charCount = result.characters().size();
+                int sceneCount = result.scenes().size();
+                send(emitter, "progress", Map.of("step", "characters", "message", "提取到 " + charCount + " 个角色，共 " + sceneCount + " 个场景", "charCount", charCount, "sceneCount", sceneCount));
+
+                // Generate YAML
+                send(emitter, "progress", Map.of("step", "yaml", "message", "正在生成 YAML 剧本..."));
+
+                User user = userService.getById(userId);
+                String yaml = yamlGeneratorService.generate(
+                        project.getTitle(), "原著小说",
+                        user.getNickname() != null ? user.getNickname() : user.getUsername(),
+                        result.characters(), result.scenes());
+
+                ScriptVersion version = projectService.saveScriptVersion(projectId, yaml);
+                projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
+
+                send(emitter, "done", Map.of(
+                        "versionId", version.getId(),
+                        "versionNumber", version.getVersionNumber(),
+                        "yamlContent", yaml,
+                        "charCount", charCount,
+                        "sceneCount", sceneCount
+                ));
+                emitter.complete();
+
+            } catch (Exception e) {
+                log.error("Generation failed", e);
+                send(emitter, "error", e.getMessage());
+                projectService.updateStatus(projectId, Project.ProjectStatus.DRAFT);
+                emitter.complete();
+            }
+        }).start();
+
+        return emitter;
+    }
+
+    private void send(SseEmitter emitter, String event, Object data) {
+        try {
+            emitter.send(SseEmitter.event().name(event).data(data));
+        } catch (IOException e) {
+            log.warn("SSE send failed", e);
+        }
+    }
+
     public List<ChapterSplitService.ChapterResult> previewChapters(Long projectId) {
-        Project project = projectService.getProject(projectId);
-        return chapterSplitService.split(project.getOriginalText());
+        return chapterSplitService.split(projectService.getProject(projectId).getOriginalText());
     }
 }

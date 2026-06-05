@@ -57,10 +57,21 @@
           <el-input v-model="form.title" placeholder="如：《三体》改编剧本" />
         </el-form-item>
         <el-form-item label="小说原文" prop="originalText">
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <el-upload
+              :auto-upload="false"
+              :show-file-list="false"
+              accept=".txt,.epub,.docx"
+              :on-change="handleFileChange"
+            >
+              <el-button size="small">上传文件 (txt/epub/docx)</el-button>
+            </el-upload>
+            <span v-if="uploading" style="color: #909399; font-size: 13px; line-height: 32px;">解析中...</span>
+          </div>
           <el-input
             v-model="form.originalText"
             type="textarea"
-            placeholder="粘贴小说原文，支持「第X章」格式自动分章，至少3章..."
+            placeholder="粘贴小说原文，或上传文件自动填充..."
             :rows="14"
           />
         </el-form-item>
@@ -78,12 +89,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listProjects, createProject, deleteProject } from '@/api/projects'
+import { uploadFile } from '@/api/files'
 
 const router = useRouter()
 const projects = ref([])
 const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
+const uploading = ref(false)
 const formRef = ref(null)
 const nickname = ref(localStorage.getItem('nickname') || '用户')
 
@@ -126,6 +139,21 @@ async function handleDelete(id) {
     ElMessage.success('已删除')
     fetchProjects()
   } catch { ElMessage.error('删除失败') }
+}
+
+async function handleFileChange(file) {
+  uploading.value = true
+  try {
+    const res = await uploadFile(file.raw)
+    const text = res.data.data.text
+    form.originalText = text
+    if (!form.title && res.data.data.filename) {
+      form.title = res.data.data.filename.replace(/\.[^.]+$/, '') + ' 改编'
+    }
+    ElMessage.success('文件解析成功')
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '解析失败')
+  } finally { uploading.value = false }
 }
 
 function handleLogout() {

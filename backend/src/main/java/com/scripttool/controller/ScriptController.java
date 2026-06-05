@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/scripts")
@@ -81,5 +82,25 @@ public class ScriptController {
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
                 "attachment; filename=script_v" + version.getVersionNumber() + ".yaml");
         response.getWriter().write(version.getYamlContent());
+    }
+
+    @PostMapping("/project/{projectId}/save")
+    public ResponseEntity<ApiResponse<?>> saveEdited(@PathVariable Long projectId,
+                                                      @RequestBody Map<String, String> body,
+                                                      Authentication auth) {
+        try {
+            Project project = projectService.getProject(projectId);
+            if (!project.getUserId().equals((Long) auth.getPrincipal())) {
+                return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
+            }
+            String yamlContent = body.get("yamlContent");
+            if (yamlContent == null || yamlContent.isBlank()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error(400, "内容不能为空"));
+            }
+            ScriptVersion version = projectService.saveScriptVersion(projectId, yamlContent);
+            return ResponseEntity.ok(ApiResponse.success(ScriptVersionResponse.from(version)));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
+        }
     }
 }
