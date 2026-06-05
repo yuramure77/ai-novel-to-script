@@ -3,7 +3,7 @@
     <!-- Top bar -->
     <header class="tb">
       <div class="tbl">
-        <el-button text size="small" @click="$router.push('/')">← 返回</el-button>
+        <el-button text size="small" @click="$router.push('/projects')">← 返回</el-button>
         <h2 v-if="!renaming" @dblclick="startRename" title="双击重命名">{{ projectTitle }}</h2>
         <el-input v-else v-model="renameTitle" size="small" style="width:240px" @blur="doRename" @keyup.enter="doRename" ref="renameRef" />
         <el-tag :type="stTag" size="small" round>{{ stText }}</el-tag>

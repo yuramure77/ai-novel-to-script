@@ -1,63 +1,66 @@
 :root {
-  --color-primary: #6366f1;
-  --color-primary-light: #818cf8;
-  --color-primary-dark: #4f46e5;
-  --color-success: #10b981;
-  --color-success-light: #34d399;
-  --color-warning: #f59e0b;
-  --color-warning-light: #fbbf24;
-  --color-danger: #ef4444;
-  --color-danger-light: #f87171;
+  --c-gold: #d4a853;
+  --c-gold-light: #f0d78c;
+  --c-amber: #c8963e;
+  --c-bronze: #8b6914;
+  --c-dark: #1a1410;
+  --c-darker: #0d0a06;
+  --c-paper: #f5f0e8;
+  --c-paper-dark: #ede4d3;
+  --c-ink: #2c2416;
+  --c-ink-light: #5c4a2e;
 
-  --color-bg: #f1f5f9;
-  --color-bg-alt: #f8fafc;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f1f5f9;
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
+  --color-primary: var(--c-gold);
+  --color-primary-light: var(--c-gold-light);
+  --color-primary-dark: var(--c-amber);
+  --color-success: #7b9b6a;
+  --color-warning: #c8963e;
+  --color-danger: #b85450;
 
-  --color-text: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-bg: var(--c-dark);
+  --color-bg-alt: #231d15;
+  --color-surface: #2a2219;
+  --color-surface-hover: #352c20;
+  --color-border: #3d3226;
+  --color-border-light: #2e261c;
 
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --color-text: var(--c-paper);
+  --color-text-secondary: #c4b99a;
+  --color-text-muted: #8b7b65;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --radius-sm: 4px; --radius: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+  --shadow-gold: 0 0 30px rgba(212,168,83,0.15);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', monospace;
   --font-serif: 'Georgia', 'Noto Serif SC', serif;
-
-  --transition: 150ms ease;
+  --transition: 200ms ease;
 }
 
-/* Dark mode */
-html.dark {
-  --color-bg: #0f172a;
-  --color-bg-alt: #1e293b;
-  --color-surface: #1e293b;
-  --color-surface-hover: #334155;
-  --color-border: #334155;
-  --color-border-light: #1e293b;
-  --color-text: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
-  --shadow: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.3);
+html.light {
+  --color-bg: #faf7f2;
+  --color-bg-alt: #f5f0e8;
+  --color-surface: #ffffff;
+  --color-surface-hover: #faf7f2;
+  --color-border: #e0d8cc;
+  --color-border-light: #f0ebe0;
+  --color-text: var(--c-ink);
+  --color-text-secondary: #5c4a2e;
+  --color-text-muted: #9b8b70;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  --shadow-gold: 0 0 20px rgba(180,150,80,0.1);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  margin: 0;
   font-family: var(--font-sans);
   background: var(--color-bg);
   color: var(--color-text);
@@ -65,5 +68,15 @@ body {
   transition: background var(--transition), color var(--transition);
 }
 
-button { font-family: inherit; }
-input, textarea { font-family: inherit; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(212,168,83,0.2); } 50% { box-shadow: 0 0 40px rgba(212,168,83,0.4); } }
+@keyframes spotlight { 0% { opacity: 0.3; transform: scale(0.8); } 100% { opacity: 0.6; transform: scale(1); } }
