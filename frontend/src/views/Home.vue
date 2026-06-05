@@ -25,11 +25,18 @@
             <span>✨</span> 快速体验
           </button>
         </div>
+        <div class="format-badges">
+          <span class="f-badge">.txt</span>
+          <span class="f-badge">.epub</span>
+          <span class="f-badge">.docx</span>
+          <span class="f-badge">📋 粘贴</span>
+        </div>
+        <p class="format-hint">支持 TXT / EPUB / DOCX 文件上传或直接粘贴原文</p>
         <div class="hero-stats">
-          <div class="stat"><strong>4</strong><span>支持格式</span></div>
           <div class="stat"><strong>AI</strong><span>智能生成</span></div>
           <div class="stat"><strong>∞</strong><span>多轮打磨</span></div>
-          <div class="stat"><strong>秒级</strong><span>剧本输出</span></div>
+          <div class="stat"><strong>实时</strong><span>流式进度</span></div>
+          <div class="stat"><strong>YAML</strong><span>结构化输出</span></div>
         </div>
       </div>
     </section>
@@ -185,6 +192,17 @@ async function tryDemo() {
   border: 2px solid var(--c-gold); box-shadow: 0 0 12px rgba(212,168,83,0.08);
 }
 .btn-secondary:hover { background: rgba(212,168,83,0.08); transform: translateY(-2px); }
+
+/* Format badges */
+.format-badges { display: flex; gap: 12px; justify-content: center; margin-bottom: 12px; }
+.f-badge {
+  padding: 8px 20px; border: 2px solid var(--c-gold); border-radius: 24px;
+  color: var(--c-gold-light); font-size: 15px; font-weight: 700;
+  font-family: var(--font-mono); letter-spacing: 1px;
+  background: rgba(212,168,83,0.08);
+}
+.f-badge:hover { background: rgba(212,168,83,0.15); transform: translateY(-1px); transition: all var(--transition); }
+.format-hint { font-size: 13px; color: var(--color-text-muted); margin-bottom: 32px; }
 
 /* Stats */
 .hero-stats {

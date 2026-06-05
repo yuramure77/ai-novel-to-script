@@ -1,12 +1,12 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
     name: ai-novel-to-script
 
   datasource:
-    url: jdbc:h2:file:./data/scripttool;DB_CLOSE_DELAY=-1;MODE=MySQL
+    url: jdbc:h2:file:${H2_PATH:./data/scripttool};DB_CLOSE_DELAY=-1;MODE=MySQL
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -25,15 +25,13 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
         format_sql: true
 
-# DeepSeek API configuration
 deepseek:
-  api-key: sk-0a877959ad5c445490d30b9050675a84
+  api-key: ${DEEPSEEK_API_KEY:sk-0a877959ad5c445490d30b9050675a84}
   api-url: https://api.deepseek.com/v1/chat/completions
   model: deepseek-chat
   max-tokens: 4096
   temperature: 0.7
 
-# JWT configuration
 jwt:
-  secret: script-tool-jwt-secret-key-2024-please-change-in-production
-  expiration: 86400000  # 24 hours in milliseconds
+  secret: ${JWT_SECRET:change-me-in-production-use-a-long-random-string}
+  expiration: 86400000

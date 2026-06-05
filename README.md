@@ -201,6 +201,62 @@ ai-novel-to-script/
 6. **下载导出** — 点击"下载 YAML"导出剧本文件，可在任何文本编辑器中进一步打磨
 7. **重新生成** — 可多次生成，每个版本独立保存
 
+## 生产部署
+
+### 快速部署（推荐）
+
+```bash
+# 1. 克隆项目
+git clone git@github.com:yuramure77/ai-novel-to-script.git
+cd ai-novel-to-script
+
+# 2. 设置环境变量
+export DEEPSEEK_API_KEY=sk-your-key-here
+export JWT_SECRET=$(openssl rand -base64 32)
+
+# 3. 一键部署
+chmod +x deploy/deploy.sh build.sh
+sudo bash deploy/deploy.sh your-domain.com
+```
+
+部署完成后：
+- 应用自动注册为 systemd 服务（崩溃自动重启）
+- Nginx 反向代理 + Let's Encrypt HTTPS 自动证书
+- 数据持久化在 `/opt/ai-novel-to-script/data/`
+
+### Docker 部署
+
+```bash
+DEEPSEEK_API_KEY=sk-xxx docker-compose up -d
+```
+
+### 手动部署
+
+```bash
+# 构建
+./build.sh
+
+# 上传 JAR 到服务器后启动
+java -Ddeepseek.api-key=sk-xxx -Djwt.secret=xxx -jar app.jar
+```
+
+### 管理命令
+
+```bash
+sudo systemctl status novel-script    # 查看状态
+sudo journalctl -u novel-script -f    # 实时日志
+sudo systemctl restart novel-script   # 重启
+```
+
+### 环境变量
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `DEEPSEEK_API_KEY` | 是 | - | DeepSeek API 密钥 |
+| `JWT_SECRET` | 生产必填 | 内置值 | JWT 签名密钥 |
+| `PORT` | 否 | 8080 | 服务端口 |
+| `H2_PATH` | 否 | ./data/scripttool | 数据库文件路径 |
+
 ## YAML 剧本 Schema
 
 详见 [docs/yaml-schema.md](docs/yaml-schema.md)

@@ -115,7 +115,15 @@
         </el-form-item>
         <el-form-item label="小说原文" prop="originalText">
           <el-upload :auto-upload="false" :show-file-list="false" accept=".txt,.epub,.docx" :on-change="onFile" drag>
-            <div class="drop-zone"><span style="font-size:28px">📁</span><p>拖拽或上传 TXT / EPUB / DOCX</p></div>
+            <div class="drop-zone">
+              <span style="font-size:28px">📁</span>
+              <p>拖拽文件到此处 或 点击上传</p>
+              <div class="format-tags">
+                <span class="ftag">TXT</span>
+                <span class="ftag">EPUB</span>
+                <span class="ftag">DOCX</span>
+              </div>
+            </div>
           </el-upload>
           <span v-if="uploading" style="color:var(--color-text-muted);font-size:12px">解析中...</span>
           <el-input v-model="form.originalText" type="textarea" placeholder="或直接粘贴小说原文..." :rows="10" style="margin-top:10px" />
@@ -283,4 +291,10 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 
 .drop-zone { text-align: center; padding: 20px; cursor: pointer }
 .drop-zone p { color: var(--color-text-muted); font-size: 13px; margin: 8px 0 0 }
+.format-tags { display: flex; gap: 8px; justify-content: center; margin-top: 10px }
+.ftag {
+  padding: 4px 14px; border: 1px solid var(--color-border); border-radius: 14px;
+  font-size: 11px; font-weight: 700; color: var(--c-gold);
+  font-family: var(--font-mono); background: rgba(212,168,83,0.06)
+}
 </style>
