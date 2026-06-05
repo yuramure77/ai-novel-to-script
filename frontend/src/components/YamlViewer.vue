@@ -18,7 +18,7 @@ import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import hljs from 'highlight.js/lib/core'
 import yaml from 'highlight.js/lib/languages/yaml'
-import 'highlight.js/styles/github.css'
+import 'highlight.js/styles/monokai.css'
 
 hljs.registerLanguage('yaml', yaml)
 

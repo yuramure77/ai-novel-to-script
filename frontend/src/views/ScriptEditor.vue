@@ -173,7 +173,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import hljs from 'highlight.js/lib/core'
 import yl from 'highlight.js/lib/languages/yaml'
-import 'highlight.js/styles/github.css'
+import 'highlight.js/styles/monokai.css'
 import { getProject, splitChapters } from '@/api/projects'
 import { listVersions, getLatest, getYamlUrl, saveEditedYaml } from '@/api/scripts'
 import { sendMessage, getHistory } from '@/api/chat'
@@ -423,6 +423,15 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .eb{display:flex;justify-content:flex-end;gap:8px;padding:8px 12px;border-top:1px solid var(--color-border-light);flex-shrink:0}
 .yv pre{font-family:var(--font-mono);font-size:13px;line-height:1.6;margin:0}
 .yv code{white-space:pre-wrap}
+/* Override highlight.js blue → gold */
+.yv :deep(.hljs-string){color:#e6c874}
+.yv :deep(.hljs-attr){color:#d4a853}
+.yv :deep(.hljs-literal){color:#d4a853}
+.yv :deep(.hljs-number){color:#e6c874}
+.yv :deep(.hljs-title){color:#d4a853}
+.yv :deep(.hljs-built_in){color:#c8b896}
+.yv :deep(.hljs-type){color:#d4a853}
+.yv :deep(.hljs-meta){color:#8b7b65}
 .rtt{height:100%;display:flex;flex-direction:column;padding:0 6px}
 .rtt :deep(.el-tabs__content){flex:1;overflow:hidden}
 .rtt :deep(.el-tab-pane){height:100%}
