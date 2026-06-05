@@ -14,6 +14,9 @@ public class Project {
     @Column(nullable = false)
     private Long userId;
 
+    @Column(nullable = true)
+    private Long folderId;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -63,6 +66,9 @@ public class Project {
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+
+    public Long getFolderId() { return folderId; }
+    public void setFolderId(Long folderId) { this.folderId = folderId; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

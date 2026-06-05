@@ -36,10 +36,24 @@ public class ProjectController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProjectResponse>>> list(Authentication auth) {
+    public ResponseEntity<ApiResponse<List<ProjectResponse>>> list(
+            @RequestParam(required = false) Long folderId, Authentication auth) {
         List<Project> projects = projectService.listUserProjects(getUserId(auth));
+        if (folderId != null) {
+            projects = projects.stream().filter(p -> folderId.equals(p.getFolderId())).toList();
+        }
         List<ProjectResponse> response = projects.stream().map(ProjectResponse::from).toList();
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PutMapping("/{id}/move")
+    public ResponseEntity<ApiResponse<?>> move(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
+        Project project = projectService.getProject(id);
+        if (!project.getUserId().equals(getUserId(auth)))
+            return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
+        Object fid = body.get("folderId");
+        project.setFolderId(fid != null ? Long.valueOf(fid.toString()) : null);
+        return ResponseEntity.ok(ApiResponse.success(ProjectResponse.from(projectService.updateProject(project))));
     }
 
     @GetMapping("/{id}")
