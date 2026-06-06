@@ -1,29 +1,30 @@
 #!/bin/bash
 set -e
-echo "=== 构建 AI 小说转剧本工具 ==="
+echo "=== Build & Deploy ==="
 
 # 1. Build frontend
-echo "[1/3] 构建前端..."
+echo "[1/4] Frontend..."
 cd "$(dirname "$0")/frontend"
-npm install --silent
+npm install --silent 2>/dev/null
 npm run build
 
-# 2. Copy frontend dist to backend static
-echo "[2/3] 复制前端资源到后端..."
+# 2. Copy to backend static
+echo "[2/4] Copy to backend..."
 rm -rf ../backend/src/main/resources/static/*
 cp -r dist/* ../backend/src/main/resources/static/
 
-# 3. Build backend JAR
-echo "[3/3] 打包后端..."
+# 3. Build JAR
+echo "[3/4] Maven package..."
 cd ../backend
 mvn clean package -DskipTests -q
 
-echo ""
-echo "=== 构建完成 ==="
-echo "JAR 包: backend/target/ai-novel-to-script-1.0.0.jar"
-echo ""
-echo "启动命令:"
-echo "  java -jar backend/target/ai-novel-to-script-1.0.0.jar"
-echo ""
-echo "或使用 Docker:"
-echo "  docker-compose up -d"
+# 4. Deploy to production
+if [ -f /opt/ai-novel-to-script/app.jar ]; then
+    echo "[4/4] Deploy + restart..."
+    cp target/ai-novel-to-script-1.0.0.jar /opt/ai-novel-to-script/app.jar
+    systemctl restart novel-script 2>/dev/null || true
+    echo "Done!"
+else
+    echo "[4/4] Skip (no /opt target)"
+    echo "JAR: $(pwd)/target/ai-novel-to-script-1.0.0.jar"
+fi
