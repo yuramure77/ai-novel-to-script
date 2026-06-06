@@ -62,8 +62,15 @@
       <!-- Main -->
       <main class="main">
         <div class="main-header">
-          <h2>{{ currentFolder ? folderName : '全部项目' }}</h2>
-          <el-button type="warning" @click="showCreate=true">＋ 新建项目</el-button>
+          <div style="display:flex;align-items:center;gap:12px">
+            <el-checkbox v-model="selectAll" @change="toggleSelectAll" :indeterminate="selIndeterminate" />
+            <h2 style="margin:0">{{ currentFolder ? folderName : '全部项目' }}</h2>
+            <span v-if="selected.size" class="sel-count">已选 {{ selected.size }} 个</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <el-button v-if="selected.size" type="danger" @click="deleteSelected" plain size="small">删除选中</el-button>
+            <el-button type="warning" @click="showCreate=true">＋ 新建项目</el-button>
+          </div>
         </div>
 
         <!-- Quick start -->
@@ -74,7 +81,8 @@
 
         <!-- Project grid -->
         <div v-if="filtered.length" class="grid stagger-in">
-          <div v-for="p in filtered" :key="p.id" class="card" @click="$router.push(`/project/${p.id}`)">
+          <div v-for="p in filtered" :key="p.id" class="card" :class="{sel:selected.has(p.id)}" @click="selected.size?toggleSelect(p.id,!selected.has(p.id)):$router.push(`/project/${p.id}`)">
+            <el-checkbox :model-value="selected.has(p.id)" @click.stop @change="(v)=>toggleSelect(p.id,v)" class="card-cb" />
             <div class="card-top-bar" :class="p.status.toLowerCase()"></div>
             <div class="card-inner">
               <div class="card-head">
@@ -145,7 +153,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { listProjects, createProject, deleteProject } from '@/api/projects'
 import { uploadFile } from '@/api/files'
 import { listFolders, createFolder, renameFolder, deleteFolder, moveProject } from '@/api/folders'
@@ -178,6 +186,27 @@ const filtered = computed(() => {
   if (currentFolder.value === null) return projects.value
   return projects.value.filter(p => p.folderId === currentFolder.value)
 })
+
+// Multi-select delete
+const selected = ref(new Set())
+const selectAll = ref(false)
+const selIndeterminate = computed(() => selected.value.size > 0 && selected.value.size < filtered.value.length)
+function toggleSelectAll(v) {
+  if(v) filtered.value.forEach(p => selected.value.add(p.id))
+  else selected.value = new Set()
+}
+function toggleSelect(id, v) { if(v) selected.value.add(id); else selected.value.delete(id) }
+async function deleteSelected() {
+  if(!selected.value.size) return
+  try {
+    await ElMessageBox.confirm(`确定删除选中的 ${selected.value.size} 个项目？此操作不可恢复。`, '批量删除', {confirmButtonText:'确认删除',cancelButtonText:'取消',type:'warning'})
+    const ids = [...selected.value]
+    for(const id of ids){try{await deleteProject(id)}catch{}}
+    ElMessage.success(`已删除 ${ids.length} 个项目`)
+    selected.value = new Set(); selectAll.value = false
+    load()
+  } catch {}
+}
 
 onMounted(async () => {
   dark.value = document.documentElement.classList.contains('light')
@@ -294,6 +323,10 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .card-info { display: flex; justify-content: space-between; color: var(--color-text-muted); font-size: 12px; margin-top: 10px }
 .card-hover { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity var(--transition) }
 .card:hover .card-hover { opacity: 1 }
+.card.sel { border-color: var(--c-gold); box-shadow: var(--shadow-gold) }
+.card-cb { position: absolute; top: 10px; left: 10px; z-index: 2; opacity: 0; transition: opacity var(--transition) }
+.card:hover .card-cb, .card.sel .card-cb { opacity: 1 }
+.sel-count { font-size: 12px; color: var(--c-gold); font-weight: 600 }
 
 .drop-zone { text-align: center; padding: 20px; cursor: pointer }
 .drop-zone p { color: var(--color-text-muted); font-size: 13px; margin: 8px 0 0 }
