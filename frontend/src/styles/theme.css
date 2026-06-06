@@ -90,30 +90,30 @@ body {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(212,168,83,0.2); } 50% { box-shadow: 0 0 40px rgba(212,168,83,0.4); } }
-@keyframes spotlight { 0% { opacity: 0.3; transform: scale(0.8); } 100% { opacity: 0.6; transform: scale(1); } }
+@keyframes spotlight { 0% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 0.7; transform: scale(1.1); } 100% { opacity: 0.2; transform: scale(0.8); } }
 
 /* Film grain overlay — active on .film-grain container */
 .film-grain::after {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
-  opacity: 0.04; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.12; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 }
 
 /* Staggered card entry */
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(40px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.stagger-in > * { animation: cardIn 0.4s ease both; }
-.stagger-in > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-in > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-in > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-in > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-in > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-in > *:nth-child(6) { animation-delay: 0.3s; }
-.stagger-in > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-in > *:nth-child(8) { animation-delay: 0.4s; }
-.stagger-in > *:nth-child(9) { animation-delay: 0.45s; }
-.stagger-in > *:nth-child(n+10) { animation-delay: 0.5s; }
+.stagger-in > * { animation: cardIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both; }
+.stagger-in > *:nth-child(1) { animation-delay: 0.03s; }
+.stagger-in > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger-in > *:nth-child(3) { animation-delay: 0.13s; }
+.stagger-in > *:nth-child(4) { animation-delay: 0.18s; }
+.stagger-in > *:nth-child(5) { animation-delay: 0.23s; }
+.stagger-in > *:nth-child(6) { animation-delay: 0.28s; }
+.stagger-in > *:nth-child(7) { animation-delay: 0.33s; }
+.stagger-in > *:nth-child(8) { animation-delay: 0.38s; }
+.stagger-in > *:nth-child(9) { animation-delay: 0.43s; }
+.stagger-in > *:nth-child(n+10) { animation-delay: 0.48s; }
 
 /* Parallax helper */
 .parallax { will-change: transform; }

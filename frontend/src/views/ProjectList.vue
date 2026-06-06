@@ -298,6 +298,11 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
 .el-dialog :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
+@media (max-width: 768px) {
+  .el-dialog :deep(.el-dialog) { width: 95% !important; margin: 10px !important; }
+  .el-dialog :deep(.el-dialog__body) { max-height: 50vh; padding: 12px; }
+  .el-upload :deep(.el-upload-dragger) { width: 100% !important; height: auto !important; padding: 12px !important; }
+}
 
 @media (max-width: 768px) {
   .topbar { padding: 0 12px; }
