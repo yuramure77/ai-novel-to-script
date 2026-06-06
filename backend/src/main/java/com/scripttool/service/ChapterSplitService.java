@@ -205,7 +205,7 @@ public class ChapterSplitService {
             return chunkByTargetCount(text, Math.min(8, Math.max(3, text.length() / 12000)));
         }
 
-        int targetChapters = Math.min(10, Math.max(5, paragraphs.length / 12));
+        int targetChapters = Math.min(8, Math.max(4, paragraphs.length / 20));
         List<ChapterResult> chapters = new ArrayList<>();
         int parasPerChapter = Math.max(1, paragraphs.length / targetChapters);
         int chapterNum = 1, paraIdx = 0;

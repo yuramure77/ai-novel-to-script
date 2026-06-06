@@ -73,8 +73,8 @@ public class ScriptService {
     /**
      * Generate with SSE streaming progress
      */
-    public SseEmitter generateScriptStream(Long projectId, Long userId) {
-        SseEmitter emitter = new SseEmitter(300_000L);
+    public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit) {
+        SseEmitter emitter = new SseEmitter(600_000L); // 10 min timeout for long novels
         SecurityContext ctx = SecurityContextHolder.getContext();
 
         new Thread(() -> {
@@ -97,22 +97,31 @@ public class ScriptService {
                     return;
                 }
 
-                projectService.updateChapterCount(projectId, chapters.size());
-                send(emitter, "progress", Map.of("step", "split", "message", "识别到 " + chapters.size() + " 个章节", "totalChapters", chapters.size()));
+                // Apply pagination: only process a range of chapters
+                int total = chapters.size();
+                int from = Math.max(0, Math.min(start, total - 1));
+                int to = limit > 0 ? Math.min(from + limit, total) : total;
+                List<ChapterSplitService.ChapterResult> page = chapters.subList(from, to);
+
+                projectService.updateChapterCount(projectId, total);
+                String pageInfo = limit > 0 ? String.format("识别到 %d 章，处理第 %d-%d 章", total, from + 1, to) :
+                        "识别到 " + total + " 个章节";
+                send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
+                        "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
                 // Incremental generation with per-chapter progress
-                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10, "totalChapters", chapters.size()));
+                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10, "totalChapters", page.size()));
 
                 ScriptGenService.ScriptResult result = scriptGenService.generateScriptIncremental(
-                        project.getOriginalText(), chapters,
-                        (chapterNum, total, sceneCount, msg) -> {
-                            int pct = 10 + (int)((double)chapterNum / total * 80);
+                        project.getOriginalText(), page,
+                        (chapterNum, totalCh, sceneCount, msg) -> {
+                            int pct = 10 + (int)((double)chapterNum / totalCh * 80);
                             send(emitter, "progress", Map.of(
                                 "step", "ai",
                                 "message", msg,
                                 "percent", pct,
                                 "chapter", chapterNum,
-                                "totalChapters", total
+                                "totalChapters", totalCh
                             ));
                         });
 
@@ -137,7 +146,8 @@ public class ScriptService {
                         "versionNumber", version.getVersionNumber(),
                         "yamlContent", yaml,
                         "charCount", charCount,
-                        "sceneCount", sceneCount
+                        "sceneCount", sceneCount,
+                        "totalChapters", total
                 ));
                 emitter.complete();
 

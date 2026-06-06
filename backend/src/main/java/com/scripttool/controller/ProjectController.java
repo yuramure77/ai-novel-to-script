@@ -156,7 +156,9 @@ public class ProjectController {
     }
 
     @GetMapping(value = "/{id}/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter generateStream(@PathVariable Long id, Authentication auth) {
-        return scriptService.generateScriptStream(id, getUserId(auth));
+    public SseEmitter generateStream(@PathVariable Long id, Authentication auth,
+            @RequestParam(defaultValue = "0") int start,
+            @RequestParam(defaultValue = "0") int limit) {
+        return scriptService.generateScriptStream(id, getUserId(auth), start, limit);
     }
 }
