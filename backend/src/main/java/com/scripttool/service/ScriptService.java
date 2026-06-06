@@ -73,7 +73,7 @@ public class ScriptService {
     /**
      * Generate with SSE streaming progress
      */
-    public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit) {
+    public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit, boolean resume) {
         SseEmitter emitter = new SseEmitter(1_800_000L); // 10 min timeout for long novels
         SecurityContext ctx = SecurityContextHolder.getContext();
 
@@ -109,9 +109,42 @@ public class ScriptService {
                 send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
                         "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
-                // Count total chunks before starting
+                // Resume: if continuing from interrupted generation, skip processed chapters
+                int resumeFrom = 0;
+                if (resume) {
+                    var latestVersion = projectService.getLatestVersion(projectId);
+                    if (latestVersion != null && latestVersion.getYamlContent() != null) {
+                        // Count chapters already in the partial YAML
+                        int maxChap = 0;
+                        for (String line : latestVersion.getYamlContent().split("\n")) {
+                            var m = java.util.regex.Pattern.compile("chapter:\\s*(\\d+)").matcher(line);
+                            if (m.find()) maxChap = Math.max(maxChap, Integer.parseInt(m.group(1)));
+                        }
+                        resumeFrom = Math.max(0, maxChap);
+                        send(emitter, "progress", Map.of("step", "resume", "message",
+                            "恢复生成，从第 " + (resumeFrom + 1) + " 章继续...", "resumeFrom", resumeFrom));
+                    }
+                }
+
+                // Skip already-processed chapters when resuming
+                List<ChapterSplitService.ChapterResult> toProcess = page;
+                if (resumeFrom > 0 && resumeFrom < total) {
+                    int skip = Math.min(resumeFrom, total);
+                    toProcess = chapters.subList(skip, total);
+                    send(emitter, "progress", Map.of("step", "split", "message",
+                        "跳过前 " + skip + " 章，处理剩余 " + toProcess.size() + " 章",
+                        "totalChapters", toProcess.size(), "fullTotal", total));
+                } else {
+                    projectService.updateChapterCount(projectId, total);
+                    String pageInfo = limit > 0 ? String.format("识别到 %d 章，处理第 %d-%d 章", total, from + 1, to) :
+                            "识别到 " + total + " 个章节";
+                    send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
+                            "totalChapters", toProcess.size(), "fullTotal", total));
+                }
+
+                // Count total chunks
                 int estChunks = 0;
-                for (var ch : page) {
+                for (var ch : toProcess) {
                     estChunks += Math.max(1, (ch.content().length() + 499) / 500);
                 }
                 send(emitter, "progress", Map.of("step", "split", "message",
@@ -121,7 +154,7 @@ public class ScriptService {
                 final ScriptVersion[] savedVersion = {null};
 
                 ScriptGenService.ScriptResult result = scriptGenService.generate(
-                        project.getOriginalText(), page,
+                        project.getOriginalText(), toProcess,
                         // Progress — called before each chunk
                         (d, t, msg) -> {
                             int pct = t > 0 ? (int)((double)d / t * 90) : 50;
