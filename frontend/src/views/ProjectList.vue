@@ -303,18 +303,30 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 }
 :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
 @media (max-width: 768px) {
-  :deep(.el-dialog) { width: 95% !important; max-width: 95vw !important; margin: 10px auto !important; }
-  :deep(.el-dialog__body) { max-height: 55vh; padding: 12px; }
+  :deep(.el-dialog) {
+    width: 95% !important; max-width: 95vw !important; min-width: 0 !important;
+    margin: 10px auto !important; box-sizing: border-box !important;
+  }
+  :deep(.el-dialog__body) {
+    max-height: 55vh; padding: 10px 12px;
+    overflow-x: hidden !important; overflow-y: auto !important;
+  }
   :deep(.el-dialog__header) { padding: 14px 14px 0; }
-  :deep(.el-dialog__footer) { padding: 8px 14px 14px; display: flex; gap: 8px; justify-content: flex-end; }
-  :deep(.el-dialog__footer) .el-button { margin-left: 0 !important; flex: 1; min-width: 0; }
-  :deep(.el-upload-dragger) { width: 100% !important; height: auto !important; padding: 12px !important; }
-  :deep(.el-form-item__label) { font-size: 13px; }
-  :deep(.el-textarea__inner) { font-size: 14px; }
+  :deep(.el-dialog__footer) { padding: 8px 14px 14px; display: flex; gap: 6px; justify-content: stretch; }
+  :deep(.el-dialog__footer) .el-button { margin-left: 0 !important; margin-right: 0 !important; flex: 1; min-width: 0; white-space: nowrap; }
+  :deep(.el-dialog__footer) .el-button + .el-button { margin-left: 0 !important; }
+  :deep(.el-upload) { display: block !important; width: 100% !important; }
+  :deep(.el-upload-dragger) { width: 100% !important; min-width: 0 !important; height: auto !important; padding: 12px 6px !important; box-sizing: border-box !important; }
+  :deep(.el-form-item) { max-width: 100%; }
+  :deep(.el-form-item__label) { font-size: 13px; max-width: 100%; word-break: break-all; }
+  :deep(.el-form-item__content) { max-width: 100%; }
+  :deep(.el-textarea__inner) { font-size: 14px; max-width: 100%; box-sizing: border-box; }
 }
 @media (max-width: 400px) {
   :deep(.el-dialog) { width: 100% !important; border-radius: 0 !important; margin: 0 !important; }
-  :deep(.el-dialog__body) { max-height: calc(100vh - 140px); padding: 10px; }
+  :deep(.el-dialog__body) { max-height: calc(100vh - 140px); padding: 8px 10px; }
+  :deep(.el-dialog__header) { padding: 10px 10px 0; }
+  :deep(.el-dialog__footer) { padding: 6px 10px 10px; }
 }
 
 @media (max-width: 768px) {
