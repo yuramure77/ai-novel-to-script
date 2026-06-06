@@ -51,7 +51,7 @@ public class ScriptService {
             projectService.updateChapterCount(projectId, chapters.size());
 
             ScriptGenService.ScriptResult result = scriptGenService.generateScript(
-                    project.getOriginalText(), chapters, p -> {});
+                    project.getOriginalText(), chapters);
             User user = userService.getById(userId);
 
             String yaml = yamlGeneratorService.generate(
@@ -100,13 +100,11 @@ public class ScriptService {
                 projectService.updateChapterCount(projectId, chapters.size());
                 send(emitter, "progress", Map.of("step", "split", "message", "识别到 " + chapters.size() + " 个章节", "totalChapters", chapters.size()));
 
-                // Extract characters + generate scenes with progress
+                // Extract characters + generate scenes
                 send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10));
 
                 ScriptGenService.ScriptResult result = scriptGenService.generateScript(
-                        project.getOriginalText(), chapters,
-                        pct -> send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", pct))
-                );
+                        project.getOriginalText(), chapters);
 
                 int charCount = result.characters().size();
                 int sceneCount = result.scenes().size();

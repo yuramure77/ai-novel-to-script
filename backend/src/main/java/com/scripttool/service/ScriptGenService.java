@@ -57,29 +57,19 @@ public class ScriptGenService {
         this.objectMapper = objectMapper;
     }
 
-    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters,
-                                         java.util.function.Consumer<Integer> onProgress) {
-        int totalSteps = chapters.size() + 1;
-        java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger(0);
-
-        // Step 1: Extract characters first (fast, single API call)
+    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
+        // Extract characters first (single API call)
         List<Map<String, Object>> allCharacters = extractCharacters(
                 chapters.get(0).content(), chapters.get(0).number());
-        done.incrementAndGet();
-        onProgress.accept(10 + (done.get() * 80 / totalSteps));
 
-        // Step 2: Process all chapters in parallel
+        // Process chapters in parallel
         List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (ChapterSplitService.ChapterResult chapter : chapters) {
             futures.add(CompletableFuture.runAsync(() -> {
-                List<Map<String, Object>> scenes = generateScenes(
-                        chapter.content(), chapter.number(), allCharacters);
-                allScenes.addAll(scenes);
-                int d = done.incrementAndGet();
-                onProgress.accept(10 + (d * 80 / totalSteps));
-                log.info("Chapter {} done ({} scenes)", chapter.number(), scenes.size());
+                allScenes.addAll(generateScenes(chapter.content(), chapter.number(), allCharacters));
+                log.info("Chapter {} done", chapter.number());
             }, executor));
         }
 
@@ -87,17 +77,16 @@ public class ScriptGenService {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                     .get(5, TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.error("Parallel chapter processing failed", e);
-            throw new RuntimeException("章节处理超时或失败", e);
+            log.error("Processing failed", e);
+            throw new RuntimeException("处理失败", e);
         }
 
         allScenes.sort((a, b) -> {
             int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
             int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
-            if (ca != cb) return ca - cb;
-            int sa = ((Number) a.getOrDefault("scene_number", 0)).intValue();
-            int sb = ((Number) b.getOrDefault("scene_number", 0)).intValue();
-            return sa - sb;
+            return ca != cb ? ca - cb :
+                ((Number) a.getOrDefault("scene_number", 0)).intValue() -
+                ((Number) b.getOrDefault("scene_number", 0)).intValue();
         });
 
         return new ScriptResult(allCharacters, allScenes);
