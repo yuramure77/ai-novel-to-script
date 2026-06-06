@@ -11,7 +11,7 @@
     <section class="hero parallax">
       <div class="hero-content">
         <div class="clapper">🎬</div>
-        <h1 class="title">剧本工坊1</h1>
+        <h1 class="title">剧本工坊</h1>
         <p class="slogan">从文字到银幕，只差一个回车</p>
         <p class="hero-desc">
           将小说章节智能转换为结构化剧本<br/>
