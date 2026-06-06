@@ -304,32 +304,30 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
 :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
-/* Apple-style frosted glass overlay — almost transparent */
+/* Frosted glass dialog — theme-adaptive (dark/light via CSS vars) */
 :deep(.el-overlay-dialog) {
   position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
   display: flex !important; align-items: center !important; justify-content: center !important;
-  background: rgba(0,0,0,0.15) !important;
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  background: var(--overlay-glass-bg, rgba(0,0,0,0.12)) !important;
+  backdrop-filter: var(--overlay-glass-blur, blur(4px));
+  -webkit-backdrop-filter: var(--overlay-glass-blur, blur(4px));
 }
-/* Apple-style frosted glass dialog — high transparency, strong blur */
 :deep(.el-dialog) {
-  background: rgba(255,255,255,0.12) !important;
-  backdrop-filter: blur(60px) saturate(180%); -webkit-backdrop-filter: blur(60px) saturate(180%);
-  border: 0.5px solid rgba(255,255,255,0.25) !important;
-  border-radius: 16px !important;
-  box-shadow:
-    0 1px 0 rgba(255,255,255,0.2) inset,
-    0 0 0 0.5px rgba(255,255,255,0.1),
-    0 16px 48px rgba(0,0,0,0.25),
-    0 4px 16px rgba(0,0,0,0.15) !important;
+  background: var(--dialog-glass-bg, rgba(20,16,10,0.3)) !important;
+  backdrop-filter: var(--dialog-glass-blur, blur(50px) saturate(150%));
+  -webkit-backdrop-filter: var(--dialog-glass-blur, blur(50px) saturate(150%));
+  border: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.08)) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--dialog-glass-shadow) !important;
+  overflow: hidden;
 }
 :deep(.el-dialog__header) {
   background: transparent !important;
-  border-bottom: 0.5px solid rgba(255,255,255,0.08);
+  border-bottom: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.06));
 }
 :deep(.el-dialog__footer) {
   background: transparent !important;
-  border-top: 0.5px solid rgba(255,255,255,0.08);
+  border-top: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.06));
 }
 @media (max-width: 768px) {
   :deep(.el-dialog) {

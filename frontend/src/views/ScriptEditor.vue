@@ -118,6 +118,8 @@
                           round
                         >{{ a.label }}</el-button>
                       </div>
+                      <div v-if="m.applied" class="action-feedback applied">✅ 已应用 · 请在右侧编辑区确认</div>
+                      <div v-if="m.discarded" class="action-feedback discarded">🗑️ 已忽略</div>
                     </div>
                   </div>
                 </div>
@@ -388,9 +390,11 @@ async function snd(){
 function doAction(a,msg,i){
   if(a.action==='apply_yaml'&&msg.yamlPatch){
     ey.value = msg.yamlPatch; yaml.value = msg.yamlPatch; edit.value = true
+    // Force Vue reactivity by replacing the message object
+    cmsgs.value.splice(i, 1, { ...msg, actions: [], applied: true })
     ElMessage.success('已应用修改，请确认后保存 (Ctrl+S)')
   } else if(a.action==='discard'){
-    cmsgs.value[i].actions = []
+    cmsgs.value.splice(i, 1, { ...msg, actions: [], discarded: true })
   }
 }
 
@@ -600,6 +604,9 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 @keyframes dotBounce{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
 
 .patch-actions{display:flex;gap:6px;margin-top:6px;padding-left:4px}
+.action-feedback{font-size:12px;margin-top:6px;padding:4px 10px;border-radius:20px;display:inline-block}
+.action-feedback.applied{color:#7b9b6a;background:rgba(123,155,106,0.1);border:1px solid rgba(123,155,106,0.2)}
+.action-feedback.discarded{color:var(--color-text-muted);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)}
 
 .chat-input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--color-border-light);align-items:center;background:var(--color-surface)}
 .chat-input-inner{flex:1}

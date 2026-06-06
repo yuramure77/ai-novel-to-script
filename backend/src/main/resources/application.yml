@@ -5,6 +5,11 @@ spring:
   application:
     name: ai-novel-to-script
 
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
   datasource:
     url: jdbc:h2:file:${H2_PATH:./data/scripttool};DB_CLOSE_DELAY=-1;MODE=MySQL
     driver-class-name: org.h2.Driver

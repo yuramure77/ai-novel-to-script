@@ -35,6 +35,14 @@
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
   --shadow-gold: 0 0 30px rgba(212,168,83,0.15);
 
+  /* Frosted glass — dark mode */
+  --dialog-glass-bg: rgba(20,16,10,0.3);
+  --dialog-glass-border: rgba(255,255,255,0.08);
+  --dialog-glass-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04);
+  --dialog-glass-blur: blur(50px) saturate(150%);
+  --overlay-glass-bg: rgba(0,0,0,0.12);
+  --overlay-glass-blur: blur(4px);
+
   --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', 'Menlo', monospace;
   --font-serif: 'Georgia', 'Noto Serif SC', serif;
@@ -56,6 +64,14 @@ html.light {
   --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
   --shadow-gold: 0 0 20px rgba(180,150,80,0.1);
+
+  /* Frosted glass — light mode */
+  --dialog-glass-bg: rgba(255,255,255,0.4);
+  --dialog-glass-border: rgba(0,0,0,0.06);
+  --dialog-glass-shadow: 0 8px 40px rgba(0,0,0,0.08), 0 0 80px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5);
+  --dialog-glass-blur: blur(50px) saturate(180%);
+  --overlay-glass-bg: rgba(0,0,0,0.04);
+  --overlay-glass-blur: blur(4px);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
