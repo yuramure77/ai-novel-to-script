@@ -351,21 +351,28 @@ function doGen(){
   gen.value=true;progressMsg.value='连接中...';yaml.value=''
   fetch(`/api/projects/${pid}/generate/stream`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
     .then(r=>{const reader=r.body.getReader(),dec=new TextDecoder();let buf=''
-      function rd(){reader.read().then(({done,value})=>{
-        if(done){gen.value=false;return}
-        buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop()||''
+      function processLines(lines){
         for(let i=0;i<lines.length;i++){
           if(!lines[i].startsWith('event:'))continue
           const ev=lines[i].replace('event:','').trim(),dl=lines[i+1]
           if(!dl?.startsWith('data:'))continue
           try{const d=JSON.parse(dl.replace('data:','').trim())
             if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
-            else if(ev==='done'){yaml.value=d.yamlContent||'';latestVersion.value={id:d.versionId,versionNumber:d.versionNumber};projectStatus.value='COMPLETED';ElMessage.success('v'+d.versionNumber+' 生成成功')}
-            else if(ev==='error'){ElMessage.error(d||'失败');gen.value=false}
-          }catch{}
+            else if(ev==='done'){yaml.value=d.yamlContent||'';latestVersion.value={id:d.versionId,versionNumber:d.versionNumber};projectStatus.value='COMPLETED';gen.value=false;ElMessage.success('v'+d.versionNumber+' 生成成功')}
+            else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
+          }catch(e){console.warn('SSE parse:',e,dl?.substring(0,80))}
         }
+      }
+      function rd(){reader.read().then(({done,value})=>{
+        if(done){
+          // Process any remaining data in buffer before finishing
+          if(buf.trim()){const lines=buf.split('\n');processLines(lines)}
+          gen.value=false;return
+        }
+        buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop()||''
+        processLines(lines)
         if(gen.value)rd()
-      })}
+      }).catch(e=>{console.error('SSE read error:',e);gen.value=false})}
       rd()
     }).catch(e=>{ElMessage.error('连接失败');gen.value=false})
 }
@@ -529,10 +536,10 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ch.on{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
 .col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.cl{width:30%;min-width:260px;border-right:1px solid var(--color-border)}
-.cc{width:45%;border-right:1px solid var(--color-border)}
+.cl{width:30%;min-width:260px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc{width:45%;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.09)}
 .cc.wide{width:70%}
-.cr{width:25%;min-width:300px}
+.cr{width:25%;min-width:300px;background:rgba(255,255,255,0.03)}
 .ct{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0}
 .cb{flex:1;overflow:auto;padding:12px}
 .cb pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--color-text)}
