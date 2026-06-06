@@ -24,7 +24,7 @@ sudo systemctl reload-or-restart novel-script
 
 # Wait for health check
 sleep 3
-if curl -sf http://localhost:8080/api/projects > /dev/null 2>&1; then
+if curl -sf http://localhost:8080 > /dev/null 2>&1; then
     echo "✅ 更新成功，服务正常"
 else
     echo "❌ 服务启动失败，查看日志: sudo journalctl -u novel-script -n 50"
