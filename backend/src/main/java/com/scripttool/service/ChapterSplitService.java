@@ -182,14 +182,24 @@ public class ChapterSplitService {
     // ── Chapter builders ──
 
     private List<ChapterResult> buildChapters(String text, List<Integer> positions, List<String> titles) {
+        // Sort by position to ensure correct order
+        record Pair(int pos, int origIdx) {}
+        List<Pair> pairs = new ArrayList<>();
+        for (int i = 0; i < positions.size(); i++) pairs.add(new Pair(positions.get(i), i));
+        pairs.sort((a, b) -> a.pos - b.pos);
+
         List<ChapterResult> chapters = new ArrayList<>();
-        for (int i = 0; i < positions.size(); i++) {
-            int start = positions.get(i);
-            int end = (i + 1 < positions.size()) ? positions.get(i + 1) : text.length();
-            if (end <= start) continue; // Skip out-of-order markers
-            String content = text.substring(start, end).trim();
-            if (content.length() >= 50) {
-                chapters.add(new ChapterResult(i + 1, titles.get(i), content));
+        for (int i = 0; i < pairs.size(); i++) {
+            int start = pairs.get(i).pos;
+            int end = (i + 1 < pairs.size()) ? pairs.get(i + 1).pos : text.length();
+            if (end <= start || start >= text.length()) continue;
+            try {
+                String content = text.substring(start, Math.min(end, text.length())).trim();
+                if (content.length() >= 50) {
+                    chapters.add(new ChapterResult(i + 1, titles.get(pairs.get(i).origIdx), content));
+                }
+            } catch (Exception e) {
+                System.err.println("Bad marker at " + start + ": " + e.getMessage());
             }
         }
         return chapters;

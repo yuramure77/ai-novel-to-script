@@ -39,16 +39,9 @@
         <span v-if="chapters.length" class="hint">{{ chapters.length }} 章</span>
         <span class="hint" style="color:var(--color-text-muted);margin-left:8px">Ctrl+F 搜索 · Ctrl+Enter 生成 · Ctrl+S 保存</span>
       </div>
-      <el-select v-model="pageSize" size="small" style="width:80px" :disabled="gen">
-        <el-option :value="3" label="3章"/>
-        <el-option :value="5" label="5章"/>
-        <el-option :value="10" label="10章"/>
-        <el-option :value="0" label="全部"/>
-      </el-select>
       <el-button type="primary" @click="doGen()" :loading="gen" :disabled="gen">
-        {{ gen ? progressMsg : genPage>0 ? `继续生成 (第${genPage+1}页)` : '生成剧本' }}
+        {{ gen ? progressMsg : '生成剧本' }}
       </el-button>
-      <el-button v-if="genPage>0&&!gen" size="small" @click="genPage=0" text>从头生成</el-button>
     </div>
 
     <!-- Progress -->
@@ -240,7 +233,7 @@ const projectTitle = ref(''); const projectStatus = ref('DRAFT')
 const originalText = ref(''); const chapters = ref([])
 const ac = ref(0); const splitting = ref(false)
 const gen = ref(false); const progressMsg = ref(''); const progressPct = ref(0)
-const genPage = ref(0); const pageSize = ref(3); const totalChapters = ref(0)
+const totalChapters = ref(0)
 const yaml = ref(''); const latestVersion = ref(null)
 const edit = ref(false); const ey = ref(''); const saveB = ref(false)
 const vers = ref([]); const showHist = ref(false)
@@ -365,12 +358,8 @@ async function doSplit(){splitting.value=true;try{const r=await splitChapters(pi
 
 // Generate SSE
 function doGen(){
-  gen.value=true;progressMsg.value='连接中...'
-  // Only clear YAML on first page; append on subsequent pages
-  if(genPage.value===0) yaml.value=''
-  const start = genPage.value * pageSize.value
-  const limit = pageSize.value
-  fetch(`/api/projects/${pid}/generate/stream?start=${start}&limit=${limit}`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
+  gen.value=true;progressMsg.value='连接中...';yaml.value=''
+  fetch(`/api/projects/${pid}/generate/stream`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
     .then(r=>{const reader=r.body.getReader(),dec=new TextDecoder();let buf=''
       function processLines(lines){
         for(let i=0;i<lines.length;i++){
@@ -402,13 +391,8 @@ function doGen(){
               gen.value=false
               if(d.totalChapters) totalChapters.value = d.totalChapters
               // Check if more chapters remain
-              const nextStart = (genPage.value + 1) * pageSize.value
-              if(pageSize.value > 0 && d.totalChapters && nextStart < d.totalChapters){
-                genPage.value++
-                ElMessage.success(`第${genPage.value}页完成 · 点击继续生成`)
               } else {
                 ElMessage.success('生成完成')
-                genPage.value = 0
               }
               fetchGenResult()
             }

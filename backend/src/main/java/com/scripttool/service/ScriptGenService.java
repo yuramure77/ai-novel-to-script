@@ -67,7 +67,7 @@ public class ScriptGenService {
 
     public ScriptResult generate(String fullText, List<ChapterSplitService.ChapterResult> chapters,
                                   ProgressCallback onProgress, ChunkCallback onChunk) {
-        if (fullText.length() > 500_000) {
+        if (fullText.length() > 1_000_000) {
             throw new RuntimeException("文本过长（" + fullText.length() + "字），请缩短至50万字以内");
         }
 
