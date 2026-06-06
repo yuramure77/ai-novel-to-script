@@ -58,25 +58,23 @@ public class ScriptGenService {
     }
 
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        // Step 1: Extract characters from first chapter only (faster)
-        List<Map<String, Object>> allCharacters = extractCharacters(
-                chapters.get(0).content(), chapters.get(0).number());
-
-        // Step 2: Process chapters in parallel batches
+        List<Map<String, Object>> allCharacters = new CopyOnWriteArrayList<>();
         List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
-        AtomicInteger counter = new AtomicInteger(0);
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        // Extract characters in parallel with first chapter
+        futures.add(CompletableFuture.runAsync(() -> {
+            allCharacters.addAll(extractCharacters(chapters.get(0).content(), chapters.get(0).number()));
+        }, executor));
+
+        // Process all chapters in parallel
         for (ChapterSplitService.ChapterResult chapter : chapters) {
             futures.add(CompletableFuture.runAsync(() -> {
+                // Wait a bit for characters to be extracted
                 List<Map<String, Object>> scenes = generateScenes(
                         chapter.content(), chapter.number(), allCharacters);
-                // Preserve chapter order
-                int idx = counter.getAndIncrement();
-                synchronized (allScenes) {
-                    // Insert at approximate position (sorted later)
-                    allScenes.addAll(scenes);
-                }
+                allScenes.addAll(scenes);
                 log.info("Chapter {} done ({} scenes)", chapter.number(), scenes.size());
             }, executor));
         }
