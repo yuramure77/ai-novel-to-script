@@ -34,6 +34,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/deploy/**").permitAll()
+                .requestMatchers("/api/export/**").permitAll()
+                .requestMatchers("/api/scripts/*/yaml").permitAll()
+                .requestMatchers("/api/ai/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()

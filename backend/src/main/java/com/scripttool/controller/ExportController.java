@@ -40,6 +40,13 @@ public class ExportController {
         writeFile(response, fountain, "script_v" + v.getVersionNumber() + ".fountain", "text/plain");
     }
 
+    @GetMapping("/{versionId}/txt")
+    public void exportTxt(@PathVariable Long versionId, HttpServletResponse response) throws IOException {
+        ScriptVersion v = versionRepo.findById(versionId).orElse(null);
+        if (v == null) { response.setStatus(404); return; }
+        writeFile(response, v.getYamlContent(), "script_v" + v.getVersionNumber() + ".txt", "text/plain");
+    }
+
     @GetMapping("/{versionId}/preview")
     public ResponseEntity<ApiResponse<?>> preview(@PathVariable Long versionId) {
         ScriptVersion v = versionRepo.findById(versionId).orElse(null);
