@@ -330,7 +330,7 @@ watch(yaml,()=>{
 })
 
 onMounted(async()=>{
-  dark.value = document.documentElement.classList.contains('dark')
+  dark.value = document.documentElement.classList.contains('light')
   try{
     const r = await getProject(pid); const d = r.data.data
     projectTitle.value=d.project?.title||'';projectStatus.value=d.project?.status||'DRAFT';originalText.value=d.originalText||''
@@ -502,7 +502,7 @@ function onKeydown(e){
   if(e.key==='Escape'&&searchOn.value)searchOn.value=false
 }
 
-function tDark(v){document.documentElement.classList.toggle('dark',v);localStorage.setItem('dark',v?'1':'0')}
+function tDark(v){document.documentElement.classList.toggle('light',v);localStorage.setItem('light',v?'1':'0')}
 function rl(r){return{protagonist:'主角',antagonist:'反派',supporting:'配角',minor:'次要'}[r]||r||''}
 function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 </script>

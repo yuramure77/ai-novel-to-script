@@ -126,7 +126,7 @@
             </div>
           </el-upload>
           <span v-if="uploading" style="color:var(--color-text-muted);font-size:12px">解析中...</span>
-          <el-input v-model="form.originalText" type="textarea" placeholder="或直接粘贴小说原文..." :rows="10" style="margin-top:10px" />
+          <el-input v-model="form.originalText" type="textarea" placeholder="或直接粘贴小说原文..." :rows="6" style="margin-top:10px" />
         </el-form-item>
       </el-form>
       <template #footer><el-button @click="showCreate=false">取消</el-button><el-button type="warning" :loading="creating" @click="create">创建</el-button></template>
@@ -176,7 +176,7 @@ const filtered = computed(() => {
 })
 
 onMounted(async () => {
-  dark.value = document.documentElement.classList.contains('dark')
+  dark.value = document.documentElement.classList.contains('light')
   await load()
   await loadFolders()
 })
@@ -221,7 +221,7 @@ async function moveP(projectId, folderId) {
 }
 
 // Misc
-function tDark(v) { document.documentElement.classList.toggle('dark', v); localStorage.setItem('dark', v ? '1' : '0') }
+function tDark(v) { document.documentElement.classList.toggle('light', v); localStorage.setItem('light', v ? '1' : '0') }
 function logout() { localStorage.clear(); router.push('/login') }
 function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 </script>
@@ -297,6 +297,7 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-size: 11px; font-weight: 700; color: var(--c-gold);
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
+.el-dialog :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
 
 @media (max-width: 768px) {
   .topbar { padding: 0 12px; }
