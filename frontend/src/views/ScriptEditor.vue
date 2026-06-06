@@ -288,44 +288,53 @@ const hyFiltered = computed(()=>{
   return hljs.highlight(out.join('\n'),{language:'yaml'}).value
 })
 
-// Parse YAML chapter index
+// Parse YAML chapter index (handles both indented and unindented formats)
 watch(yaml,()=>{
   const chs = {}; let cur = 0
   for(const l of yaml.value.split('\n')){
-    const m = l.match(/^\s{4}chapter:\s*(\d+)/)
+    const m = l.match(/^\s*chapter:\s*(\d+)/)
     if(m){cur=parseInt(m[1]);chs[cur]=(chs[cur]||0)+1}
   }
   yamlChapters.value = Object.entries(chs).map(([n,c])=>({num:parseInt(n),count:c,label:'第'+n+'章'}))
 })
 
-// Parse characters from YAML
+// Parse characters from YAML (handles both AI-generated and demo formats)
 watch(yaml,()=>{
   try{
-    const out=[]; let cur=null; const lines=yaml.value.split('\n')
+    const out=[]; let cur=null; const lines=yaml.value.split('\n'); let inChars=false
     for(let i=0;i<lines.length;i++){
       const l=lines[i]
-      // Match any indented name: field under characters list
-      const nm=l.match(/^\s+-\s+name:\s*"?([^"\n]+)/)
+      // Detect characters section
+      if(l.match(/^characters\s*:/)){inChars=true;continue}
+      if(inChars && l.match(/^\w/)){inChars=false;continue}
+      if(!inChars)continue
+      // Match name: field — with or without leading dash (AI: "- name:" vs demo: "    - name:")
+      const nm=l.match(/^\s*-?\s*name:\s*"?([^"\n]+)/)
       if(nm){if(cur)out.push(cur);cur={name:nm[1].trim()};continue}
       if(!cur)continue
-      const r=l.match(/^\s+role:\s*"?(\w+)/);if(r)cur.role=r[1]
-      const d=l.match(/^\s+description:\s*"?([^"\n]+)/);if(d)cur.description=d[1].replace(/^"|"$/g,'')
-      const t=l.match(/^\s+-\s*"?([^"\n]+)/);if(t&&!l.includes('name:')&&!l.includes('role:')&&!l.includes('description:')&&!l.includes('first_appearance:')&&!l.includes('id:')){cur.traits??=[];cur.traits.push(t[1].replace(/^"|"$/g,'').trim())}
+      const r=l.match(/^\s*role:\s*"?(\w+)/);if(r)cur.role=r[1]
+      const d=l.match(/^\s*description:\s*"?([^"\n]+)/);if(d)cur.description=d[1].replace(/^"|"$/g,'')
+      const t=l.match(/^\s*-\s*"?([^"\n]+)/);if(t&&!l.includes('name:')&&!l.includes('role:')&&!l.includes('description:')&&!l.includes('id:')){cur.traits??=[];cur.traits.push(t[1].replace(/^"|"$/g,'').trim())}
     }
     if(cur)out.push(cur)
     chars.value=out.filter(c=>c.name)
-  }catch{}
+  }catch(e){console.warn('char parse:',e)}
 })
 
 watch(yaml,()=>{
   try{
-    const out=[];
-    const sp=yaml.value.split(/(?=  - id: SCENE_)/g)
-    for(const s of sp){
+    const out=[]; const txt=yaml.value
+    // Split scenes: AI format "- title:" / "- scene_id:" / demo format "  - id: SCENE_"
+    const re=/(?:^|\n)\s*- (?:id: |title: |scene_id: )/
+    let lastIdx=0; const matches=[...txt.matchAll(new RegExp(re,'g'))]
+    for(let i=0;i<matches.length;i++){
+      const start=matches[i].index+(matches[i][0].startsWith('\n')?1:0)
+      const end=i+1<matches.length?matches[i+1].index:txt.length
+      const s=txt.substring(start,end)
       const loc=s.match(/location:\s*"?([^"\n]+)/)
       const time=s.match(/time:\s*"?([^"\n]+)/)
-      const desc=s.match(/description:\s*"?([^"\n]+)/)
-      out.push({title:(loc?loc[1]:'')+' · '+(time?time[1]:''),description:desc?desc[1]:'',location:loc?loc[1]:'',time:time?time[1]:''})
+      const desc=s.match(/(?:description|title):\s*"?([^"\n]+)/)
+      out.push({title:(desc?desc[1]:loc?loc[1]:'')+' · '+(time?time[1]:''),description:desc?desc[1]:loc?loc[1]:'',location:loc?loc[1]:'',time:time?time[1]:''})
     }
     sceneImgs.value = out
   }catch{}
