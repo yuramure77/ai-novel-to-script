@@ -108,7 +108,7 @@
     </div>
 
     <!-- Create dialog -->
-    <el-dialog v-model="showCreate" title="新建项目" width="640px" :close-on-click-modal="false">
+    <el-dialog v-model="showCreate" title="新建项目" :width="dialogWidth" :close-on-click-modal="false">
       <el-form :model="form" :rules="rules" ref="fr" label-position="top">
         <el-form-item label="项目名称" prop="title">
           <el-input v-model="form.title" placeholder="如：《三体》改编剧本" size="large" />
@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listProjects, createProject, deleteProject } from '@/api/projects'
@@ -170,6 +170,8 @@ const folderName = computed(() => {
   const f = folders.value.find(f => f.id === currentFolder.value)
   return f ? f.name : ''
 })
+const dialogWidth = ref('640px')
+function onResize() { dialogWidth.value = window.innerWidth < 768 ? '95%' : '640px' }
 const filtered = computed(() => {
   if (currentFolder.value === null) return projects.value
   return projects.value.filter(p => p.folderId === currentFolder.value)
@@ -177,9 +179,11 @@ const filtered = computed(() => {
 
 onMounted(async () => {
   dark.value = document.documentElement.classList.contains('light')
+  onResize(); window.addEventListener('resize', onResize)
   await load()
   await loadFolders()
 })
+onUnmounted(() => window.removeEventListener('resize', onResize))
 
 async function load() {
   loading.value = true
@@ -297,11 +301,20 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-size: 11px; font-weight: 700; color: var(--c-gold);
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
-.el-dialog :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
+:deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
 @media (max-width: 768px) {
-  .el-dialog :deep(.el-dialog) { width: 95% !important; margin: 10px !important; }
-  .el-dialog :deep(.el-dialog__body) { max-height: 50vh; padding: 12px; }
-  .el-upload :deep(.el-upload-dragger) { width: 100% !important; height: auto !important; padding: 12px !important; }
+  :deep(.el-dialog) { width: 95% !important; max-width: 95vw !important; margin: 10px auto !important; }
+  :deep(.el-dialog__body) { max-height: 55vh; padding: 12px; }
+  :deep(.el-dialog__header) { padding: 14px 14px 0; }
+  :deep(.el-dialog__footer) { padding: 8px 14px 14px; display: flex; gap: 8px; justify-content: flex-end; }
+  :deep(.el-dialog__footer) .el-button { margin-left: 0 !important; flex: 1; min-width: 0; }
+  :deep(.el-upload-dragger) { width: 100% !important; height: auto !important; padding: 12px !important; }
+  :deep(.el-form-item__label) { font-size: 13px; }
+  :deep(.el-textarea__inner) { font-size: 14px; }
+}
+@media (max-width: 400px) {
+  :deep(.el-dialog) { width: 100% !important; border-radius: 0 !important; margin: 0 !important; }
+  :deep(.el-dialog__body) { max-height: calc(100vh - 140px); padding: 10px; }
 }
 
 @media (max-width: 768px) {
