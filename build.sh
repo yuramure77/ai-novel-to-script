@@ -16,7 +16,7 @@ cp -r dist/* ../backend/src/main/resources/static/
 # 3. Build backend JAR
 echo "[3/3] 打包后端..."
 cd ../backend
-mvn package -DskipTests -q
+mvn clean package -DskipTests -q
 
 echo ""
 echo "=== 构建完成 ==="
