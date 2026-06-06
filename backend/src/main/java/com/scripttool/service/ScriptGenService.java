@@ -102,18 +102,9 @@ public class ScriptGenService {
             limited = chapters.subList(0, 15);
         }
 
-        // Extract characters from first 3 chapters (sampled)
-        StringBuilder sample = new StringBuilder();
-        int toSample = Math.min(3, limited.size());
-        for (int i = 0; i < toSample; i++) {
-            String content = limited.get(i).content();
-            if (content.length() > CHUNK_SIZE * 2) {
-                content = content.substring(0, CHUNK_SIZE * 2);
-            }
-            sample.append(content).append("\n\n");
-        }
-        List<Map<String, Object>> allCharacters = extractCharacters(sample.toString(), limited.get(0).number());
-        log.info("Extracted {} characters", allCharacters.size());
+        // Skip separate character extraction — saves 10s at startup.
+        // Characters are parsed from YAML by the frontend; AI generates them inline.
+        List<Map<String, Object>> allCharacters = List.of();
 
         int total = limited.size();
 
