@@ -109,9 +109,13 @@ public class ScriptService {
                 send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
                         "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
-                // Simple incremental generation — one chunk at a time, push after each
-                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 0,
-                        "totalChunks", 0));
+                // Count total chunks before starting
+                int estChunks = 0;
+                for (var ch : page) {
+                    estChunks += Math.max(1, (ch.content().length() + 499) / 500);
+                }
+                send(emitter, "progress", Map.of("step", "split", "message",
+                    "拆分为 " + estChunks + " 个小块，开始生成...", "percent", 0, "totalChunks", estChunks));
 
                 User user = userService.getById(userId);
                 final ScriptVersion[] savedVersion = {null};
