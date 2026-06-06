@@ -22,7 +22,7 @@ public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int BATCH_SIZE = 3;           // chapters to process in parallel per batch
+    private static final int BATCH_SIZE = 6;           // chunks to process in parallel — more=faster
     private static final int CHUNK_SIZE = 8000;        // chars per AI call — bigger=faster, smaller=better
     private static final int CHUNK_OVERLAP = 200;      // overlap to maintain context across chunks
     private static final int MAX_TOTAL_TEXT = 500_000; // 50万字上限，超过拒绝
