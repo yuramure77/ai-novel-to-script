@@ -90,18 +90,34 @@ public class FileParserService {
     }
 
     /**
-     * Strip XML/HTML tags, decode entities, normalize whitespace
+     * Strip XML/HTML tags while preserving paragraph structure.
+     * Block elements (p, div, br, h1-h6, li) become newlines.
      */
     private String stripXml(String xml) {
-        return xml.replaceAll("<[^>]+>", " ")
-                  .replaceAll("&nbsp;", " ")
-                  .replaceAll("&amp;", "&")
-                  .replaceAll("&lt;", "<")
-                  .replaceAll("&gt;", ">")
-                  .replaceAll("&quot;", "\"")
-                  .replaceAll("&apos;", "'")
-                  .replaceAll("&#\\d+;", " ")
-                  .replaceAll("\\s+", " ")
-                  .trim();
+        // Replace block-level tags with newlines to preserve paragraph structure
+        String result = xml
+            .replaceAll("(?i)<br\\s*/?>", "\n")
+            .replaceAll("(?i)</?p[^>]*>", "\n")
+            .replaceAll("(?i)</?div[^>]*>", "\n")
+            .replaceAll("(?i)</?h[1-6][^>]*>", "\n")
+            .replaceAll("(?i)</?li[^>]*>", "\n")
+            .replaceAll("(?i)</?section[^>]*>", "\n")
+            .replaceAll("(?i)</?article[^>]*>", "\n")
+            // Replace remaining HTML tags with space (inline tags like <span>, <em>, etc.)
+            .replaceAll("<[^>]+>", " ")
+            // Decode entities
+            .replaceAll("&nbsp;", " ")
+            .replaceAll("&amp;", "&")
+            .replaceAll("&lt;", "<")
+            .replaceAll("&gt;", ">")
+            .replaceAll("&quot;", "\"")
+            .replaceAll("&apos;", "'")
+            .replaceAll("&#\\d+;", " ")
+            // Normalize: collapse multiple spaces but preserve newlines
+            .replaceAll("[^\\S\n]+", " ")
+            // Collapse multiple newlines into double newline
+            .replaceAll("\n{3,}", "\n\n")
+            .trim();
+        return result;
     }
 }
