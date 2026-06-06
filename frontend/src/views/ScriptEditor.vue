@@ -373,27 +373,21 @@ function doGen(){
           try{const d=JSON.parse(dl.replace('data:','').trim())
             if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
             else if(ev==='chapter_done'){
-              // Show partial result immediately — don't wait for all chapters
               if(d.yamlContent){
                 yaml.value=d.yamlContent
                 latestVersion.value={id:d.versionId,versionNumber:d.versionNumber}
               }
               if(d.percent)progressPct.value=d.percent
-              progressMsg.value=`第${d.chapter}/${d.totalChapters}章完成`
+              progressMsg.value='生成中...'
             }
             else if(ev==='done'){
-              // Use SSE data immediately if available
               if(d.yamlContent){
                 yaml.value=d.yamlContent
                 latestVersion.value={id:d.versionId,versionNumber:d.versionNumber}
                 projectStatus.value='COMPLETED'
               }
-              gen.value=false
+              gen.value=false;ElMessage.success('生成完成')
               if(d.totalChapters) totalChapters.value = d.totalChapters
-              // Check if more chapters remain
-              } else {
-                ElMessage.success('生成完成')
-              }
               fetchGenResult()
             }
             else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
