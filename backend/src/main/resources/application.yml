@@ -26,7 +26,7 @@ spring:
         format_sql: true
 
 deepseek:
-  api-key: ${DEEPSEEK_API_KEY:sk-0a877959ad5c445490d30b9050675a84}
+  api-key: ${DEEPSEEK_API_KEY}
   api-url: https://api.deepseek.com/v1/chat/completions
   model: deepseek-chat
   max-tokens: 4096
