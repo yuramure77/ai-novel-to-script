@@ -22,15 +22,16 @@ public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int PARALLEL_CHAPTERS = 3;
-    private static final int CHUNK_SIZE = 3500;      // chars per AI call — small enough for quality
-    private static final int CHUNK_OVERLAP = 400;     // overlap to maintain context across chunks
+    private static final int BATCH_SIZE = 3;           // chapters to process in parallel per batch
+    private static final int CHUNK_SIZE = 5000;        // chars per AI call — bigger=faster, smaller=better
+    private static final int CHUNK_OVERLAP = 300;      // overlap to maintain context across chunks
     private static final int MAX_TOTAL_TEXT = 500_000; // 50万字上限，超过拒绝
+    private static final int MIN_CHUNK_FOR_SPLIT = 7000; // only split chapters longer than this
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final ExecutorService executor = Executors.newFixedThreadPool(PARALLEL_CHAPTERS);
+    private final ExecutorService executor = Executors.newFixedThreadPool(BATCH_SIZE);
 
     private static final String SYSTEM_PROMPT = """
 你是一个专业的剧本改编助手。你需要将小说文本转换为结构化的剧本格式。
@@ -138,8 +139,8 @@ public class ScriptGenService {
     private List<Map<String, Object>> generateChapterScenes(
             String text, int chapterNum, List<Map<String, Object>> chars) {
 
-        // If text is short enough, process as a single chunk
-        if (text.length() <= CHUNK_SIZE) {
+        // If text is short enough, process as a single chunk (faster)
+        if (text.length() <= MIN_CHUNK_FOR_SPLIT) {
             return generateScenesSingle(text, chapterNum, chars, 1);
         }
 
