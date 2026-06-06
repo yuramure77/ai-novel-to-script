@@ -140,9 +140,9 @@
                   @keyup.enter="snd"
                   :disabled="cw"
                   size="default"
-                  class="chat-input"
+                  class="chat-input-inner"
                 />
-                <el-button type="primary" @click="snd" :loading="cw" :icon="'Promotion'" size="default" circle />
+                <el-button type="warning" @click="snd" :loading="cw" size="default" round>发送</el-button>
               </div>
             </div>
           </el-tab-pane>
@@ -597,8 +597,13 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 
 .patch-actions{display:flex;gap:6px;margin-top:6px;padding-left:4px}
 
-.chat-input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--color-border-light);align-items:center}
-.chat-input{flex:1}
+.chat-input-bar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--color-border-light);align-items:center;background:var(--color-surface)}
+.chat-input-inner{flex:1}
+.chat-input-inner :deep(.el-input__wrapper){background:var(--color-bg-alt);border-color:var(--color-border);box-shadow:none}
+.chat-input-inner :deep(.el-input__inner){color:var(--color-text)}
+.chat-input-inner :deep(.el-input__inner::placeholder){color:var(--color-text-muted)}
+.chat-input-bar :deep(.el-button--warning){background:var(--c-gold);border-color:var(--c-gold);color:var(--c-darker);font-weight:700}
+.chat-input-bar :deep(.el-button--warning):hover{background:var(--c-gold-light)}
 
 /* Characters */
 .chars{padding:8px;overflow:auto;height:100%}
