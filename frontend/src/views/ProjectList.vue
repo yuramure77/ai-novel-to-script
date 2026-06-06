@@ -79,12 +79,14 @@
             <div class="card-inner">
               <div class="card-head">
                 <h3>{{ p.title }}</h3>
-                <el-tag :type="p.status==='COMPLETED'?'success':p.status==='PROCESSING'?'warning':'info'" size="small" round effect="dark">
-                  {{ {DRAFT:'草稿',PROCESSING:'处理中',COMPLETED:'已完成'}[p.status] }}
-                </el-tag>
               </div>
               <div class="card-info">
-                <span>🎞️ {{ p.chapterCount }} 章</span>
+                <span>
+                  <el-tag :type="p.status==='COMPLETED'?'success':p.status==='PROCESSING'?'warning':'info'" size="small" round effect="dark">
+                    {{ {DRAFT:'草稿',PROCESSING:'处理中',COMPLETED:'已完成'}[p.status] }}
+                  </el-tag>
+                  🎞️ {{ p.chapterCount }} 章
+                </span>
                 <span>{{ fmt(p.updatedAt) }}</span>
               </div>
             </div>
@@ -302,10 +304,22 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
 :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
+:deep(.el-overlay-dialog) {
+  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  background: rgba(0,0,0,0.3) !important;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+:deep(.el-dialog) {
+  background: rgba(30,28,26,0.88) !important;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(212,168,83,0.15) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(212,168,83,0.08) !important;
+}
 @media (max-width: 768px) {
   :deep(.el-dialog) {
     width: 95% !important; max-width: 95vw !important; min-width: 0 !important;
-    margin: 10px auto !important; box-sizing: border-box !important;
+    margin: 0 !important; box-sizing: border-box !important;
   }
   :deep(.el-dialog__body) {
     max-height: 55vh; padding: 10px 12px;

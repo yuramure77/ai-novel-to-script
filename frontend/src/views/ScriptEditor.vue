@@ -65,7 +65,7 @@
       <!-- Center: YAML -->
       <div class="col cc" :class="{wide:!showR}">
         <div class="ct"><span>📄 剧本</span>
-          <div><el-button size="small" text @click="edit=!edit">{{edit?'预览':'编辑'}}</el-button>
+          <div><el-button size="small" text @click="toggleEdit">{{edit?'预览':'编辑'}}</el-button>
             <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button></div>
         </div>
         <!-- YAML chapter index -->
@@ -369,6 +369,7 @@ function doGen(){
 }
 
 // YAML edit
+function toggleEdit(){if(!edit.value){ey.value=yaml.value};edit.value=!edit.value}
 async function svY(){if(!ey.value.trim())return;saveB.value=true;try{const r=await saveEditedYaml(pid,ey.value);yaml.value=ey.value;latestVersion.value={id:r.data.data.id,versionNumber:r.data.data.versionNumber};ElMessage.success('v'+r.data.data.versionNumber+' 已保存');edit.value=false;loadV()}catch{ElMessage.error('保存失败')}finally{saveB.value=false}}
 
 // Chat

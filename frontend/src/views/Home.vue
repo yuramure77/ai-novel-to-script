@@ -155,7 +155,7 @@ async function tryDemo() {
   position: relative; z-index: 1;
 }
 .hero-content {
-  animation: fadeInUp 0.8s ease-out;
+  animation: fadeInUp 0.4s ease-out;
 }
 .clapper { font-size: 64px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(212,168,83,0.3)); }
 .title {
