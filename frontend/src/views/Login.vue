@@ -95,4 +95,11 @@ async function register() {
 .back-home { text-align: center; margin-top: 20px; }
 .back-home a { color: var(--color-text-muted); font-size: 12px; text-decoration: none; }
 .back-home a:hover { color: var(--c-gold); }
+
+@media (max-width: 768px) {
+  .login-card { width: 92%; padding: 28px 20px; margin: 16px; }
+  .brand h1 { font-size: 22px; }
+  .clapper { font-size: 36px; }
+  .film-strip { display: none; }
+}
 </style>

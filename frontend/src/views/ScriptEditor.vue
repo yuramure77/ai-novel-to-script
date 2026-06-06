@@ -638,4 +638,30 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .tgr:hover{background:var(--color-surface-hover)}
 .vr{display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--color-border-light)}
 .vt{display:block;font-size:11px;color:var(--color-text-muted)}
+
+@media (max-width: 768px) {
+  .editor{height:auto;min-height:100vh}
+  .tb{flex-wrap:wrap;height:auto;padding:8px 10px;gap:6px}
+  .tbl h2{font-size:14px}
+  .tbr{flex-wrap:wrap}
+  .sbar{padding:6px 10px}
+  .act{flex-wrap:wrap;gap:8px;padding:6px 10px}
+  .actl{flex-wrap:wrap}
+  .hint{font-size:10px}
+  .chaps{padding:4px 10px}
+  .ch{font-size:10px;padding:2px 8px}
+  .main{flex-direction:column;overflow:auto}
+  .cl,.cc,.cr{width:100%!important;min-width:auto!important;max-height:50vh;border-right:none;border-bottom:1px solid var(--color-border)}
+  .cr{max-height:none}
+  .toggle-r{display:none}
+  .col-title{font-size:11px;padding:5px 10px}
+  .col-body{padding:10px}
+  .col-body pre{font-size:13px;line-height:1.7}
+  .cbb :deep(pre){max-height:140px}
+  .chatmsgs{max-height:300px}
+  .msg-row.user .msg-body{max-width:90%}
+  .bubble{font-size:12px;padding:8px 10px}
+  .msg-avatar{width:24px;height:24px;font-size:12px}
+  .bottom-bar,.editbar{padding:6px 10px}
+}
 </style>

@@ -252,9 +252,22 @@ async function tryDemo() {
 
 @media (max-width: 800px) {
   .title { font-size: 32px; letter-spacing: 4px; }
-  .feature-strip { flex-direction: column; align-items: center; }
+  .slogan { font-size: 16px; letter-spacing: 2px; }
+  .hero { min-height: auto; padding: 60px 20px 40px; }
+  .hero-desc { font-size: 13px; }
+  .hero-actions { flex-direction: column; align-items: center; }
+  .btn-primary, .btn-secondary { width: 80%; justify-content: center; padding: 14px 20px; font-size: 15px; }
+  .hero-stats { gap: 20px; flex-wrap: wrap; }
+  .stat strong { font-size: 22px; }
+  .format-badges { flex-wrap: wrap; gap: 8px; }
+  .f-badge { padding: 6px 14px; font-size: 13px; }
+  .format-hint { font-size: 11px; }
+  .features { padding: 40px 20px; }
+  .features h2 { font-size: 22px; }
+  .feature-strip { flex-direction: column; align-items: center; gap: 16px; }
+  .feat { width: 100%; max-width: 320px; }
   .feat-arrow { transform: rotate(90deg); padding: 0; }
-  .hero-stats { gap: 20px; }
   .film-strip { display: none; }
+  .spotlight { width: 300px; height: 300px; top: -100px; }
 }
 </style>

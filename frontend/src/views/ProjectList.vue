@@ -297,4 +297,20 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-size: 11px; font-weight: 700; color: var(--c-gold);
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
+
+@media (max-width: 768px) {
+  .topbar { padding: 0 12px; }
+  .logo { font-size: 15px; }
+  .nav-slogan { display: none; }
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; min-height: auto; padding: 12px; border-right: none; border-bottom: 1px solid var(--color-border); }
+  .sidebar-header { margin-bottom: 8px; }
+  .folder-list { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .folder-item { font-size: 12px; padding: 4px 10px; }
+  .main { padding: 16px 12px; }
+  .main-header h2 { font-size: 18px; }
+  .grid { grid-template-columns: 1fr; }
+  .card-hover { opacity: 1; }
+  .card:hover .card-hover { opacity: 1; }
+}
 </style>
