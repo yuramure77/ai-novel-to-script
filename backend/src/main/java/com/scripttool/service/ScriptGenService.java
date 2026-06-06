@@ -59,10 +59,27 @@ public class ScriptGenService {
     }
 
     /**
+     * Callback for progress updates during incremental generation.
+     */
+    @FunctionalInterface
+    public interface ProgressCallback {
+        void onProgress(int chapterNum, int totalChapters, int sceneCount, String message);
+    }
+
+    /**
      * Main entry: generate script from chapters.
      * Uses chunked parallel processing for long chapters.
      */
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
+        return generateScriptIncremental(fullText, chapters, null);
+    }
+
+    /**
+     * Incremental generation with per-chapter progress callback.
+     * Processes chapters one at a time (each may be internally chunked/parallel).
+     */
+    public ScriptResult generateScriptIncremental(String fullText,
+            List<ChapterSplitService.ChapterResult> chapters, ProgressCallback callback) {
         // Extract characters from first 3 chapters (sampled)
         StringBuilder sample = new StringBuilder();
         int toSample = Math.min(3, chapters.size());
@@ -76,26 +93,21 @@ public class ScriptGenService {
         List<Map<String, Object>> allCharacters = extractCharacters(sample.toString(), chapters.get(0).number());
         log.info("Extracted {} characters", allCharacters.size());
 
-        // Process chapters in parallel, each chapter may be chunked
-        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        int total = chapters.size();
 
-        for (ChapterSplitService.ChapterResult chapter : chapters) {
-            futures.add(CompletableFuture.runAsync(() -> {
-                List<Map<String, Object>> chapterScenes = generateChapterScenes(
-                        chapter.content(), chapter.number(), allCharacters);
-                allScenes.addAll(chapterScenes);
-                log.info("Chapter {} done — {} scenes from {} chars",
-                        chapter.number(), chapterScenes.size(), chapter.content().length());
-            }, executor));
-        }
+        // Process chapters sequentially (each internally parallelized via chunking)
+        List<Map<String, Object>> allScenes = new ArrayList<>();
+        for (int i = 0; i < chapters.size(); i++) {
+            ChapterSplitService.ChapterResult chapter = chapters.get(i);
+            List<Map<String, Object>> chapterScenes = generateChapterScenes(
+                    chapter.content(), chapter.number(), allCharacters);
+            allScenes.addAll(chapterScenes);
 
-        try {
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                    .get(5, TimeUnit.MINUTES);
-        } catch (Exception e) {
-            log.error("Processing failed", e);
-            throw new RuntimeException("处理失败: " + e.getMessage(), e);
+            if (callback != null) {
+                callback.onProgress(i + 1, total, chapterScenes.size(),
+                        "第" + chapter.number() + "章完成 (" + chapterScenes.size() + "个场景)");
+            }
+            log.info("Incremental chapter {}/{} done — {} scenes", i + 1, total, chapterScenes.size());
         }
 
         // Sort scenes: by chapter, then scene_number

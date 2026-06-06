@@ -100,11 +100,21 @@ public class ScriptService {
                 projectService.updateChapterCount(projectId, chapters.size());
                 send(emitter, "progress", Map.of("step", "split", "message", "识别到 " + chapters.size() + " 个章节", "totalChapters", chapters.size()));
 
-                // Extract characters + generate scenes
-                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10));
+                // Incremental generation with per-chapter progress
+                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10, "totalChapters", chapters.size()));
 
-                ScriptGenService.ScriptResult result = scriptGenService.generateScript(
-                        project.getOriginalText(), chapters);
+                ScriptGenService.ScriptResult result = scriptGenService.generateScriptIncremental(
+                        project.getOriginalText(), chapters,
+                        (chapterNum, total, sceneCount, msg) -> {
+                            int pct = 10 + (int)((double)chapterNum / total * 80);
+                            send(emitter, "progress", Map.of(
+                                "step", "ai",
+                                "message", msg,
+                                "percent", pct,
+                                "chapter", chapterNum,
+                                "totalChapters", total
+                            ));
+                        });
 
                 int charCount = result.characters().size();
                 int sceneCount = result.scenes().size();

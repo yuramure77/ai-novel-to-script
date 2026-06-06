@@ -40,33 +40,74 @@ public class ChapterSplitService {
         // Try numbered section markers
         if (chapters.size() < 3) chapters = new ArrayList<>(splitByMarkers(text, NUM_MARKER));
 
-        // If still no good split, fall back to size-based chunking
+        // If still no good split, use paragraph-based smart chunking
         if (chapters.size() < 3 && text.length() > 3000) {
-            chapters = chunkBySize(text, 4000);
+            chapters = smartChunk(text);
         }
         if (chapters.isEmpty()) chapters.add(new ChapterResult(1, "全文", text));
         return chapters;
     }
 
-    /** Size-based fallback: split long text into chunks of ~chunkSize chars */
-    private List<ChapterResult> chunkBySize(String text, int chunkSize) {
-        List<ChapterResult> chunks = new ArrayList<>();
-        int start = 0;
-        int num = 1;
-        while (start < text.length()) {
-            int end = Math.min(start + chunkSize, text.length());
-            // Try to break at paragraph boundary
-            if (end < text.length()) {
-                int breakPt = text.lastIndexOf("\n\n", end);
-                if (breakPt > start + chunkSize / 2) end = breakPt;
+    /**
+     * Smart chunking: group paragraphs into chapters.
+     * Targets 5-10 chapters regardless of text length.
+     * Uses double-newlines as natural paragraph boundaries.
+     */
+    private List<ChapterResult> smartChunk(String text) {
+        // Split into paragraphs
+        String[] paragraphs = text.split("\n\n");
+        if (paragraphs.length < 10) {
+            // Too few paragraphs, just wrap as-is or split by another heuristic
+            return chunkByTargetCount(text, 6);
+        }
+
+        // Group paragraphs into target number of chapters
+        int targetChapters = Math.min(10, Math.max(5, paragraphs.length / 15));
+        List<ChapterResult> chapters = new ArrayList<>();
+        int parasPerChapter = Math.max(1, paragraphs.length / targetChapters);
+        int chapterNum = 1;
+        int paraIdx = 0;
+
+        while (paraIdx < paragraphs.length) {
+            int end = Math.min(paraIdx + parasPerChapter, paragraphs.length);
+            StringBuilder content = new StringBuilder();
+            for (int i = paraIdx; i < end; i++) {
+                if (!paragraphs[i].isBlank()) {
+                    content.append(paragraphs[i].trim()).append("\n\n");
+                }
+            }
+            String chapterText = content.toString().trim();
+            if (chapterText.length() >= 50) {
+                chapters.add(new ChapterResult(chapterNum++, "第" + (chapterNum - 1) + "章", chapterText));
+            }
+            paraIdx = end;
+        }
+        return chapters;
+    }
+
+    /** Fallback: split text into exactly targetCount chunks of roughly equal size */
+    private List<ChapterResult> chunkByTargetCount(String text, int targetCount) {
+        int totalLen = text.length();
+        int chunkSize = Math.max(2000, totalLen / targetCount);
+        List<ChapterResult> chapters = new ArrayList<>();
+        int start = 0, num = 1;
+        while (start < totalLen && num <= 20) {
+            int end = Math.min(start + chunkSize, totalLen);
+            // Find best break point
+            if (end < totalLen) {
+                int brk = text.lastIndexOf("\n\n", end);
+                if (brk < start + chunkSize / 2) {
+                    brk = text.lastIndexOf("\n", end);
+                }
+                if (brk > start + chunkSize / 2) end = brk;
             }
             String content = text.substring(start, end).trim();
             if (content.length() >= 100) {
-                chunks.add(new ChapterResult(num++, "第" + (num - 1) + "部分", content));
+                chapters.add(new ChapterResult(num++, "第" + (num - 1) + "章", content));
             }
             start = end;
         }
-        return chunks;
+        return chapters;
     }
 
     private List<ChapterResult> splitByMarkers(String text, Pattern markerPattern) {
