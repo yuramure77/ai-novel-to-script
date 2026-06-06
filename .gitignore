@@ -33,3 +33,6 @@ Thumbs.db
 
 # Config with secrets
 application-local.yml
+
+# Build output
+backend/src/main/resources/static/
