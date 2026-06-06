@@ -4,21 +4,14 @@ After=network.target
 
 [Service]
 Type=simple
-User=app
+User=root
 WorkingDirectory=/opt/ai-novel-to-script
-
-# Environment
 Environment=DEEPSEEK_API_KEY=sk-your-key-here
-Environment=JWT_SECRET=generate-a-random-string-at-least-32-chars
 Environment=PORT=8080
 Environment=H2_PATH=/opt/ai-novel-to-script/data/scripttool
-
-# Run
 ExecStart=/usr/bin/java -Xmx512m -jar /opt/ai-novel-to-script/app.jar
 Restart=always
 RestartSec=5
-
-# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=novel-script
