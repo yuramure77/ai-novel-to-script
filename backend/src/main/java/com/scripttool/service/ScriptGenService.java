@@ -57,12 +57,21 @@ public class ScriptGenService {
         this.objectMapper = objectMapper;
     }
 
-    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        // Extract characters first (single API call)
-        List<Map<String, Object>> allCharacters = extractCharacters(
-                chapters.get(0).content(), chapters.get(0).number());
+    private static final int MAX_TEXT_LENGTH = 8000; // chars per AI call
 
-        // Process chapters in parallel
+    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
+        // Extract characters from first 3 chapters (or all if fewer), truncated
+        StringBuilder sample = new StringBuilder();
+        int toSample = Math.min(3, chapters.size());
+        for (int i = 0; i < toSample; i++) {
+            String content = chapters.get(i).content();
+            if (content.length() > MAX_TEXT_LENGTH) {
+                content = content.substring(0, MAX_TEXT_LENGTH);
+            }
+            sample.append(content).append("\n\n");
+        }
+        List<Map<String, Object>> allCharacters = extractCharacters(
+                truncate(sample.toString()), chapters.get(0).number());
         List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
@@ -101,13 +110,19 @@ public class ScriptGenService {
         return chars;
     }
 
+    private String truncate(String text) {
+        return text.length() > MAX_TEXT_LENGTH ? text.substring(0, MAX_TEXT_LENGTH) : text;
+    }
+
     private List<Map<String, Object>> generateScenes(String text, int chapterNum, List<Map<String, Object>> chars) {
         String hint = chars.isEmpty() ? "暂无" : chars.stream()
                 .map(c -> c.get("name").toString())
                 .reduce((a, b) -> a + ", " + b).orElse("暂无");
+        // Truncate long chapter texts to fit AI context window
+        String truncated = truncate(text);
         String prompt = String.format(
                 "请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s",
-                chapterNum, hint, text);
+                chapterNum, hint, truncated);
         String response = callWithRetry(prompt);
         Map<String, Object> result = parseJsonResponse(response);
         @SuppressWarnings("unchecked")
