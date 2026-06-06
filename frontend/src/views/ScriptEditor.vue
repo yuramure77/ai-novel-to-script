@@ -358,7 +358,7 @@ function doGen(){
           if(!dl?.startsWith('data:'))continue
           try{const d=JSON.parse(dl.replace('data:','').trim())
             if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
-            else if(ev==='done'){yaml.value=d.yamlContent||'';latestVersion.value={id:d.versionId,versionNumber:d.versionNumber};projectStatus.value='COMPLETED';gen.value=false;ElMessage.success('v'+d.versionNumber+' 生成成功')}
+            else if(ev==='done'){gen.value=false;ElMessage.success('v'+d.versionNumber+' 生成成功');loadGenResult()}
             else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
           }catch(e){console.warn('SSE parse:',e,dl?.substring(0,80))}
         }
@@ -375,6 +375,18 @@ function doGen(){
       }).catch(e=>{console.error('SSE read error:',e);gen.value=false})}
       rd()
     }).catch(e=>{ElMessage.error('连接失败');gen.value=false})
+}
+
+// Fetch latest version after generation (more reliable than SSE data)
+async function loadGenResult(){
+  try{
+    const v=await getLatest(pid)
+    if(v.data.data){
+      yaml.value=v.data.data.yamlContent||''
+      latestVersion.value=v.data.data
+      projectStatus.value='COMPLETED'
+    }
+  }catch(e){console.error('loadGenResult:',e)}
 }
 
 // YAML edit
