@@ -69,15 +69,27 @@ public class ScriptGenService {
     }
 
     /**
-     * Main entry: generate script from chapters.
-     * Uses chunked parallel processing for long chapters.
+     * Callback invoked after EACH chapter, with accumulated results so far.
+     * This enables the frontend to show partial results immediately.
      */
+    @FunctionalInterface
+    public interface ChapterCallback {
+        void onChapterDone(int chapterNum, int totalChapters, List<Map<String, Object>> chars,
+                           List<Map<String, Object>> scenesSoFar, boolean isLast);
+    }
+
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        return generateScriptIncremental(fullText, chapters, null);
+        return generateScriptIncremental(fullText, chapters, null, null);
     }
 
     public ScriptResult generateScriptIncremental(String fullText,
             List<ChapterSplitService.ChapterResult> chapters, ProgressCallback callback) {
+        return generateScriptIncremental(fullText, chapters, callback, null);
+    }
+
+    public ScriptResult generateScriptIncremental(String fullText,
+            List<ChapterSplitService.ChapterResult> chapters, ProgressCallback progressCb,
+            ChapterCallback chapterCb) {
         // Guard: refuse extremely long texts
         if (fullText.length() > MAX_TOTAL_TEXT) {
             throw new RuntimeException(String.format(
@@ -112,10 +124,24 @@ public class ScriptGenService {
             List<Map<String, Object>> chapterScenes = generateChapterScenes(
                     chapter.content(), chapter.number(), allCharacters);
             allScenes.addAll(chapterScenes);
+            boolean isLast = (i == limited.size() - 1);
 
-            if (callback != null) {
-                callback.onProgress(i + 1, total, chapterScenes.size(),
+            if (progressCb != null) {
+                progressCb.onProgress(i + 1, total, chapterScenes.size(),
                         "第" + chapter.number() + "章完成 (" + chapterScenes.size() + "个场景)");
+            }
+            // Notify with accumulated results after EACH chapter
+            if (chapterCb != null) {
+                // Return sorted copy of scenes so far
+                List<Map<String, Object>> soFar = new ArrayList<>(allScenes);
+                soFar.sort((a, b) -> {
+                    int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
+                    int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
+                    return ca != cb ? ca - cb :
+                        ((Number) a.getOrDefault("scene_number", 0)).intValue() -
+                        ((Number) b.getOrDefault("scene_number", 0)).intValue();
+                });
+                chapterCb.onChapterDone(i + 1, total, allCharacters, soFar, isLast);
             }
             log.info("Incremental chapter {}/{} done — {} scenes", i + 1, total, chapterScenes.size());
         }

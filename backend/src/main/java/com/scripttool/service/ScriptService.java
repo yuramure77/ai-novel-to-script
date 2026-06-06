@@ -109,41 +109,64 @@ public class ScriptService {
                 send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
                         "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
-                // Incremental generation with per-chapter progress
-                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10, "totalChapters", page.size()));
+                // Incremental generation with per-chapter progress + partial saves
+                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 5, "totalChapters", page.size()));
+
+                User user = userService.getById(userId);
+                final String[] latestYaml = {""};
+                final ScriptVersion[] savedVersion = {null};
 
                 ScriptGenService.ScriptResult result = scriptGenService.generateScriptIncremental(
                         project.getOriginalText(), page,
+                        // Progress callback
                         (chapterNum, totalCh, sceneCount, msg) -> {
-                            int pct = 10 + (int)((double)chapterNum / totalCh * 80);
+                            int pct = 5 + (int)((double)chapterNum / totalCh * 75);
                             send(emitter, "progress", Map.of(
-                                "step", "ai",
-                                "message", msg,
-                                "percent", pct,
+                                "step", "ai", "message", msg, "percent", pct,
+                                "chapter", chapterNum, "totalChapters", totalCh
+                            ));
+                        },
+                        // Chapter callback — called after EACH chapter with accumulated results
+                        (chapterNum, totalCh, chars, scenesSoFar, isLast) -> {
+                            String partialYaml = yamlGeneratorService.generate(
+                                    project.getTitle(), "原著小说",
+                                    user.getNickname() != null ? user.getNickname() : user.getUsername(),
+                                    chars, scenesSoFar);
+                            latestYaml[0] = partialYaml;
+                            // Save version after each chapter
+                            if (savedVersion[0] == null) {
+                                savedVersion[0] = projectService.saveScriptVersion(projectId, partialYaml);
+                            } else {
+                                // Update existing version with accumulated content
+                                savedVersion[0] = projectService.saveScriptVersion(projectId, partialYaml);
+                            }
+                            int pct = 80 + (int)((double)chapterNum / totalCh * 15);
+                            send(emitter, "chapter_done", Map.of(
+                                "yamlContent", partialYaml,
+                                "versionId", savedVersion[0].getId(),
+                                "versionNumber", savedVersion[0].getVersionNumber(),
                                 "chapter", chapterNum,
-                                "totalChapters", totalCh
+                                "totalChapters", totalCh,
+                                "charCount", chars.size(),
+                                "sceneCount", scenesSoFar.size(),
+                                "isLast", isLast,
+                                "percent", pct
                             ));
                         });
 
                 int charCount = result.characters().size();
                 int sceneCount = result.scenes().size();
-                send(emitter, "progress", Map.of("step", "ai", "message", "提取到 " + charCount + " 个角色，" + sceneCount + " 个场景", "percent", 90));
 
-                // Generate YAML
-                send(emitter, "progress", Map.of("step", "yaml", "message", "生成 YAML 剧本...", "percent", 95));
-
-                User user = userService.getById(userId);
-                String yaml = yamlGeneratorService.generate(
-                        project.getTitle(), "原著小说",
-                        user.getNickname() != null ? user.getNickname() : user.getUsername(),
-                        result.characters(), result.scenes());
-
-                ScriptVersion version = projectService.saveScriptVersion(projectId, yaml);
+                // Final save + done
+                String yaml = latestYaml[0];
+                if (savedVersion[0] != null) {
+                    projectService.saveScriptVersion(projectId, yaml);
+                }
                 projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
 
                 send(emitter, "done", Map.of(
-                        "versionId", version.getId(),
-                        "versionNumber", version.getVersionNumber(),
+                        "versionId", savedVersion[0] != null ? savedVersion[0].getId() : 0,
+                        "versionNumber", savedVersion[0] != null ? savedVersion[0].getVersionNumber() : 1,
                         "yamlContent", yaml,
                         "charCount", charCount,
                         "sceneCount", sceneCount,
