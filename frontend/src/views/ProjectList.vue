@@ -304,32 +304,32 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
 :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
-/* Apple-style frosted glass overlay */
+/* Apple-style frosted glass overlay — almost transparent */
 :deep(.el-overlay-dialog) {
   position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
   display: flex !important; align-items: center !important; justify-content: center !important;
-  background: rgba(0,0,0,0.2) !important;
-  backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);
+  background: rgba(0,0,0,0.15) !important;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
-/* Apple-style frosted glass dialog */
+/* Apple-style frosted glass dialog — high transparency, strong blur */
 :deep(.el-dialog) {
-  background: rgba(28,28,30,0.65) !important;
-  backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 1px solid rgba(255,255,255,0.12) !important;
+  background: rgba(255,255,255,0.12) !important;
+  backdrop-filter: blur(60px) saturate(180%); -webkit-backdrop-filter: blur(60px) saturate(180%);
+  border: 0.5px solid rgba(255,255,255,0.25) !important;
   border-radius: 16px !important;
   box-shadow:
-    0 2px 0 rgba(255,255,255,0.06) inset,
-    0 0 0 0.5px rgba(255,255,255,0.08),
-    0 8px 40px rgba(0,0,0,0.4),
-    0 32px 80px rgba(0,0,0,0.3) !important;
+    0 1px 0 rgba(255,255,255,0.2) inset,
+    0 0 0 0.5px rgba(255,255,255,0.1),
+    0 16px 48px rgba(0,0,0,0.25),
+    0 4px 16px rgba(0,0,0,0.15) !important;
 }
 :deep(.el-dialog__header) {
   background: transparent !important;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 0.5px solid rgba(255,255,255,0.08);
 }
 :deep(.el-dialog__footer) {
   background: transparent !important;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 0.5px solid rgba(255,255,255,0.08);
 }
 @media (max-width: 768px) {
   :deep(.el-dialog) {

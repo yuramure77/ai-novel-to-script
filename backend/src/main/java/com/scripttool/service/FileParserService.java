@@ -49,24 +49,44 @@ public class FileParserService {
 
     /**
      * EPUB: a ZIP containing XHTML/HTML files
+     * Handles various encodings and nested directory structures
      */
     private String parseEpub(MultipartFile file) throws Exception {
         var sb = new StringBuilder();
         try (var zis = new ZipInputStream(file.getInputStream())) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                String name = entry.getName();
-                if (name.endsWith(".html") || name.endsWith(".xhtml") || name.endsWith(".htm")) {
-                    String content = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                String name = entry.getName().toLowerCase();
+                // Skip non-content files
+                if (entry.isDirectory()) { zis.closeEntry(); continue; }
+                if (!name.endsWith(".html") && !name.endsWith(".xhtml") && !name.endsWith(".htm")) {
+                    zis.closeEntry(); continue;
+                }
+                // Skip nav/toc/index files
+                String baseName = name.substring(name.lastIndexOf('/') + 1);
+                if (baseName.startsWith("nav") || baseName.startsWith("toc") || baseName.startsWith("index")) {
+                    zis.closeEntry(); continue;
+                }
+                try {
+                    byte[] bytes = zis.readAllBytes();
+                    String content = new String(bytes, StandardCharsets.UTF_8);
+                    // Handle UTF-8 BOM
+                    if (content.startsWith("﻿")) content = content.substring(1);
                     String text = stripXml(content);
                     if (!text.isBlank()) {
                         sb.append(text).append("\n\n");
                     }
+                } catch (Exception e) {
+                    System.err.println("[epub] Failed to parse entry: " + name + " — " + e.getMessage());
                 }
                 zis.closeEntry();
             }
         }
-        return sb.toString().trim();
+        String result = sb.toString().trim();
+        if (result.isEmpty()) {
+            throw new RuntimeException("EPUB 文件中未找到文本内容，请确认文件格式正确");
+        }
+        return result;
     }
 
     /**
