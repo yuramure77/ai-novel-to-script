@@ -22,9 +22,10 @@ public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int PARALLEL_CHAPTERS = 4;
+    private static final int PARALLEL_CHAPTERS = 3;
     private static final int CHUNK_SIZE = 3500;      // chars per AI call — small enough for quality
     private static final int CHUNK_OVERLAP = 400;     // overlap to maintain context across chunks
+    private static final int MAX_TOTAL_TEXT = 500_000; // 50万字上限，超过拒绝
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
@@ -74,31 +75,39 @@ public class ScriptGenService {
         return generateScriptIncremental(fullText, chapters, null);
     }
 
-    /**
-     * Incremental generation with per-chapter progress callback.
-     * Processes chapters one at a time (each may be internally chunked/parallel).
-     */
     public ScriptResult generateScriptIncremental(String fullText,
             List<ChapterSplitService.ChapterResult> chapters, ProgressCallback callback) {
+        // Guard: refuse extremely long texts
+        if (fullText.length() > MAX_TOTAL_TEXT) {
+            throw new RuntimeException(String.format(
+                    "文本过长（%d字），请缩短至50万字以内或分段上传", fullText.length()));
+        }
+        // Limit to 15 chapters max
+        List<ChapterSplitService.ChapterResult> limited = chapters;
+        if (chapters.size() > 15) {
+            log.warn("Too many chapters ({}), limiting to first 15", chapters.size());
+            limited = chapters.subList(0, 15);
+        }
+
         // Extract characters from first 3 chapters (sampled)
         StringBuilder sample = new StringBuilder();
-        int toSample = Math.min(3, chapters.size());
+        int toSample = Math.min(3, limited.size());
         for (int i = 0; i < toSample; i++) {
-            String content = chapters.get(i).content();
+            String content = limited.get(i).content();
             if (content.length() > CHUNK_SIZE * 2) {
                 content = content.substring(0, CHUNK_SIZE * 2);
             }
             sample.append(content).append("\n\n");
         }
-        List<Map<String, Object>> allCharacters = extractCharacters(sample.toString(), chapters.get(0).number());
+        List<Map<String, Object>> allCharacters = extractCharacters(sample.toString(), limited.get(0).number());
         log.info("Extracted {} characters", allCharacters.size());
 
-        int total = chapters.size();
+        int total = limited.size();
 
         // Process chapters sequentially (each internally parallelized via chunking)
         List<Map<String, Object>> allScenes = new ArrayList<>();
-        for (int i = 0; i < chapters.size(); i++) {
-            ChapterSplitService.ChapterResult chapter = chapters.get(i);
+        for (int i = 0; i < limited.size(); i++) {
+            ChapterSplitService.ChapterResult chapter = limited.get(i);
             List<Map<String, Object>> chapterScenes = generateChapterScenes(
                     chapter.content(), chapter.number(), allCharacters);
             allScenes.addAll(chapterScenes);

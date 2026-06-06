@@ -9,7 +9,7 @@ WorkingDirectory=/opt/ai-novel-to-script
 Environment=DEEPSEEK_API_KEY=请替换为你的真实API密钥
 Environment=PORT=8080
 Environment=H2_PATH=/opt/ai-novel-to-script/data/scripttool
-ExecStart=/usr/bin/java -Xmx512m -jar /opt/ai-novel-to-script/app.jar
+ExecStart=/usr/bin/java -Xmx1024m -jar /opt/ai-novel-to-script/app.jar
 Restart=always
 RestartSec=5
 StandardOutput=journal
