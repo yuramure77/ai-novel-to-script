@@ -77,7 +77,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <p>AI 小说转剧本工具 · XEngineer 新工科计划</p>
+      <p>AI 小说转剧本工具 · XEngineer 新工科计划 · 自动部署测试 v1.0</p>
     </footer>
   </div>
 </template>
