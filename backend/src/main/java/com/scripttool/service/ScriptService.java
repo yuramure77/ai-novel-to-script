@@ -5,6 +5,8 @@ import com.scripttool.model.entity.ScriptVersion;
 import com.scripttool.model.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -71,9 +73,11 @@ public class ScriptService {
      * Generate with SSE streaming progress
      */
     public SseEmitter generateScriptStream(Long projectId, Long userId) {
-        SseEmitter emitter = new SseEmitter(300_000L); // 5 min timeout
+        SseEmitter emitter = new SseEmitter(300_000L);
+        SecurityContext ctx = SecurityContextHolder.getContext();
 
         new Thread(() -> {
+            SecurityContextHolder.setContext(ctx);
             try {
                 Project project = projectService.getProject(projectId);
                 if (!project.getUserId().equals(userId)) {
@@ -130,6 +134,8 @@ public class ScriptService {
                 send(emitter, "error", e.getMessage());
                 projectService.updateStatus(projectId, Project.ProjectStatus.DRAFT);
                 emitter.complete();
+            } finally {
+                SecurityContextHolder.clearContext();
             }
         }).start();
 
