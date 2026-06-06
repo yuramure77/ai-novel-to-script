@@ -186,6 +186,7 @@ public class ChapterSplitService {
         for (int i = 0; i < positions.size(); i++) {
             int start = positions.get(i);
             int end = (i + 1 < positions.size()) ? positions.get(i + 1) : text.length();
+            if (end <= start) continue; // Skip out-of-order markers
             String content = text.substring(start, end).trim();
             if (content.length() >= 50) {
                 chapters.add(new ChapterResult(i + 1, titles.get(i), content));
