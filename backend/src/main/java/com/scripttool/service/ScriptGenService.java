@@ -23,10 +23,10 @@ public class ScriptGenService {
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
     private static final int BATCH_SIZE = 3;           // chapters to process in parallel per batch
-    private static final int CHUNK_SIZE = 5000;        // chars per AI call — bigger=faster, smaller=better
-    private static final int CHUNK_OVERLAP = 300;      // overlap to maintain context across chunks
+    private static final int CHUNK_SIZE = 8000;        // chars per AI call — bigger=faster, smaller=better
+    private static final int CHUNK_OVERLAP = 200;      // overlap to maintain context across chunks
     private static final int MAX_TOTAL_TEXT = 500_000; // 50万字上限，超过拒绝
-    private static final int MIN_CHUNK_FOR_SPLIT = 7000; // only split chapters longer than this
+    private static final int MIN_CHUNK_FOR_SPLIT = 10000; // only split chapters longer than this
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
