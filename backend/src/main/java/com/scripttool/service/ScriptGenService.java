@@ -22,16 +22,16 @@ public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int BATCH_SIZE = 6;           // chunks to process in parallel — more=faster
-    private static final int CHUNK_SIZE = 8000;        // chars per AI call — bigger=faster, smaller=better
-    private static final int CHUNK_OVERLAP = 200;      // overlap to maintain context across chunks
-    private static final int MAX_TOTAL_TEXT = 500_000; // 50万字上限，超过拒绝
-    private static final int MIN_CHUNK_FOR_SPLIT = 10000; // only split chapters longer than this
+    private static final int MAX_CONCURRENT = 8;       // Max parallel AI calls — more=faster
+    private static final int CHUNK_SIZE = 6000;        // Smaller chunks = faster individual responses
+    private static final int CHUNK_OVERLAP = 200;
+    private static final int MAX_TOTAL_TEXT = 500_000;
+    private static final int MIN_CHUNK_FOR_SPLIT = 8000; // Only split chapters >8K chars
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final ExecutorService executor = Executors.newFixedThreadPool(BATCH_SIZE);
+    private final ExecutorService executor = Executors.newFixedThreadPool(MAX_CONCURRENT);
 
     private static final String SYSTEM_PROMPT = """
 你是一个专业的剧本改编助手。你需要将小说文本转换为结构化的剧本格式。
@@ -76,6 +76,9 @@ public class ScriptGenService {
     public interface ChapterCallback {
         void onChapterDone(int chapterNum, int totalChapters, List<Map<String, Object>> chars,
                            List<Map<String, Object>> scenesSoFar, boolean isLast);
+        /** Called per-chunk when a chapter has multiple chunks — gives faster first response */
+        default void onChunkDone(int chapterNum, int totalChapters, List<Map<String, Object>> chars,
+                                 List<Map<String, Object>> scenesSoFar, boolean isFirstChapter) {}
     }
 
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
@@ -108,36 +111,67 @@ public class ScriptGenService {
 
         int total = limited.size();
 
-        // Process chapters sequentially (each internally parallelized via chunking)
-        List<Map<String, Object>> allScenes = new ArrayList<>();
-        for (int i = 0; i < limited.size(); i++) {
-            ChapterSplitService.ChapterResult chapter = limited.get(i);
-            List<Map<String, Object>> chapterScenes = generateChapterScenes(
-                    chapter.content(), chapter.number(), allCharacters);
-            allScenes.addAll(chapterScenes);
-            boolean isLast = (i == limited.size() - 1);
+        // Flatten ALL chapters into individual chunks for maximum parallelism
+        record ChunkTask(int chapterNum, int chunkIdx, int totalChapters, String text) {}
+        List<ChunkTask> allChunks = new ArrayList<>();
+        for (ChapterSplitService.ChapterResult chapter : limited) {
+            if (chapter.content().length() <= MIN_CHUNK_FOR_SPLIT) {
+                allChunks.add(new ChunkTask(chapter.number(), 1, total, chapter.content()));
+            } else {
+                List<String> parts = splitIntoChunks(chapter.content());
+                for (int j = 0; j < parts.size(); j++) {
+                    allChunks.add(new ChunkTask(chapter.number(), j + 1, total, parts.get(j)));
+                }
+            }
+        }
+        log.info("Total {} chunks across {} chapters — processing in parallel (max {})",
+                allChunks.size(), total, MAX_CONCURRENT);
 
-            if (progressCb != null) {
-                progressCb.onProgress(i + 1, total, chapterScenes.size(),
-                        "第" + chapter.number() + "章完成 (" + chapterScenes.size() + "个场景)");
-            }
-            // Notify with accumulated results after EACH chapter
-            if (chapterCb != null) {
-                // Return sorted copy of scenes so far
-                List<Map<String, Object>> soFar = new ArrayList<>(allScenes);
-                soFar.sort((a, b) -> {
-                    int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
-                    int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
-                    return ca != cb ? ca - cb :
-                        ((Number) a.getOrDefault("scene_number", 0)).intValue() -
-                        ((Number) b.getOrDefault("scene_number", 0)).intValue();
-                });
-                chapterCb.onChapterDone(i + 1, total, allCharacters, soFar, isLast);
-            }
-            log.info("Incremental chapter {}/{} done — {} scenes", i + 1, total, chapterScenes.size());
+        // Process ALL chunks in one parallel pool — first-come-first-displayed
+        List<Map<String, Object>> allScenes = Collections.synchronizedList(new ArrayList<>());
+        Map<Integer, AtomicInteger> chapterDoneCount = new ConcurrentHashMap<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        for (ChunkTask task : allChunks) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                List<Map<String, Object>> scenes = generateScenesSingle(
+                        task.text(), task.chapterNum(), allCharacters, task.chunkIdx());
+                allScenes.addAll(scenes);
+
+                int done = chapterDoneCount.computeIfAbsent(task.chapterNum(),
+                        k -> new AtomicInteger(0)).incrementAndGet();
+
+                // Fire callback immediately after each chunk for real-time display
+                if (chapterCb != null) {
+                    List<Map<String, Object>> soFar = new ArrayList<>(allScenes);
+                    soFar.sort((a, b) -> {
+                        int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
+                        int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
+                        return ca != cb ? ca - cb :
+                            ((Number) a.getOrDefault("scene_number", 0)).intValue() -
+                            ((Number) b.getOrDefault("scene_number", 0)).intValue();
+                    });
+                    chapterCb.onChunkDone(task.chapterNum(), total, allCharacters, soFar,
+                            task.chapterNum() == 1);
+                }
+                if (progressCb != null) {
+                    long totalDone = chapterDoneCount.values().stream()
+                            .mapToInt(AtomicInteger::get).sum();
+                    progressCb.onProgress((int) totalDone, allChunks.size(),
+                            scenes.size(), totalDone + "/" + allChunks.size() + " 块完成");
+                }
+            }, executor));
         }
 
-        // Sort scenes: by chapter, then scene_number
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(5, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("Generation failed", e);
+            throw new RuntimeException("生成失败: " + e.getMessage(), e);
+        }
+
+        // Final sort + callback
         allScenes.sort((a, b) -> {
             int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
             int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
@@ -145,6 +179,9 @@ public class ScriptGenService {
                 ((Number) a.getOrDefault("scene_number", 0)).intValue() -
                 ((Number) b.getOrDefault("scene_number", 0)).intValue();
         });
+        if (chapterCb != null) {
+            chapterCb.onChapterDone(total, total, allCharacters, allScenes, true);
+        }
 
         return new ScriptResult(allCharacters, allScenes);
     }
@@ -154,7 +191,8 @@ public class ScriptGenService {
      * overlapping chunks, process in parallel, then merge.
      */
     private List<Map<String, Object>> generateChapterScenes(
-            String text, int chapterNum, List<Map<String, Object>> chars) {
+            String text, int chapterNum, List<Map<String, Object>> chars,
+            ChapterCallback callback, int totalChapters) {
 
         // If text is short enough, process as a single chunk (faster)
         if (text.length() <= MIN_CHUNK_FOR_SPLIT) {
@@ -165,10 +203,10 @@ public class ScriptGenService {
         List<String> chunks = splitIntoChunks(text);
         log.info("Chapter {} split into {} chunks ({} chars total)", chapterNum, chunks.size(), text.length());
 
-        // Process chunks in parallel
-        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
-        AtomicInteger chunkIdx = new AtomicInteger(0);
+        // Process chunks in parallel, fire callback on each completion
+        List<Map<String, Object>> allScenes = Collections.synchronizedList(new ArrayList<>());
         List<CompletableFuture<Void>> chunkFutures = new ArrayList<>();
+        boolean isFirstChapter = (chapterNum == 1);
 
         for (int i = 0; i < chunks.size(); i++) {
             final int idx = i;
@@ -177,6 +215,18 @@ public class ScriptGenService {
                 List<Map<String, Object>> scenes = generateScenesSingle(
                         chunk, chapterNum, chars, idx + 1);
                 allScenes.addAll(scenes);
+                // Fire callback immediately after each chunk completes (first chapter only, for speed)
+                if (isFirstChapter && callback != null) {
+                    List<Map<String, Object>> soFar = new ArrayList<>(allScenes);
+                    soFar.sort((a, b) -> {
+                        int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
+                        int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
+                        return ca != cb ? ca - cb :
+                            ((Number) a.getOrDefault("scene_number", 0)).intValue() -
+                            ((Number) b.getOrDefault("scene_number", 0)).intValue();
+                    });
+                    callback.onChunkDone(chapterNum, totalChapters, chars, soFar, true);
+                }
             }, executor));
         }
 
