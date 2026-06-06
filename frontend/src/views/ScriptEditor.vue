@@ -64,7 +64,7 @@
 
       <!-- Center: YAML -->
       <div class="col cc" :class="{wide:!showR}">
-        <div class="ct"><span>📄 剧本 1</span>
+        <div class="ct"><span>📄 剧本</span>
           <div><el-button size="small" text @click="edit=!edit">{{edit?'预览':'编辑'}}</el-button>
             <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button></div>
         </div>
