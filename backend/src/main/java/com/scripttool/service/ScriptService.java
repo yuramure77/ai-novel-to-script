@@ -74,7 +74,7 @@ public class ScriptService {
      * Generate with SSE streaming progress
      */
     public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit) {
-        SseEmitter emitter = new SseEmitter(600_000L); // 10 min timeout for long novels
+        SseEmitter emitter = new SseEmitter(1_800_000L); // 10 min timeout for long novels
         SecurityContext ctx = SecurityContextHolder.getContext();
 
         new Thread(() -> {
