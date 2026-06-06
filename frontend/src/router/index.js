@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
-  { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
-  { path: '/projects', name: 'ProjectList', component: () => import('@/views/ProjectList.vue'), meta: { requiresAuth: true } },
-  { path: '/project/:id', name: 'ScriptEditor', component: () => import('@/views/ScriptEditor.vue'), meta: { requiresAuth: true } },
-  { path: '/', name: 'Home', component: () => import('@/views/Home.vue') }
+  { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { transition: 'fade' } },
+  { path: '/projects', name: 'ProjectList', component: () => import('@/views/ProjectList.vue'), meta: { requiresAuth: true, transition: 'slide' } },
+  { path: '/project/:id', name: 'ScriptEditor', component: () => import('@/views/ScriptEditor.vue'), meta: { requiresAuth: true, transition: 'slide' } },
+  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { transition: 'fade' } }
 ]
 
 const router = createRouter({ history: createWebHistory(), routes })

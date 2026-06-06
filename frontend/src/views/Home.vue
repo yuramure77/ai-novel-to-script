@@ -1,5 +1,5 @@
 <template>
-  <div class="home">
+  <div class="home film-grain">
     <!-- Film perforations -->
     <div class="film-strip left"></div>
     <div class="film-strip right"></div>
@@ -8,7 +8,7 @@
     <div class="spotlight"></div>
 
     <!-- Hero section -->
-    <section class="hero">
+    <section class="hero parallax">
       <div class="hero-content">
         <div class="clapper">🎬</div>
         <h1 class="title">剧本工坊</h1>

@@ -9,89 +9,45 @@ import java.util.regex.Pattern;
 @Service
 public class ChapterSplitService {
 
-    // Match Chinese chapter markers: 第一章, 第1章, Chapter 1, etc.
-    private static final Pattern CHAPTER_PATTERN = Pattern.compile(
-            "(第[一二三四五六七八九十百千万零\\d]+章\\s*.*?)(?=第[一二三四五六七八九十百千万零\\d]+章|$)",
-            Pattern.DOTALL
+    // Split on line-start chapter markers: ^第X章
+    private static final Pattern CH_MARKER = Pattern.compile(
+            "^(第[一二三四五六七八九十百千万零\\d]+章[^\\n]*)", Pattern.MULTILINE
     );
-
-    // Fallback: match "Chapter N" style
-    private static final Pattern CHAPTER_PATTERN_EN = Pattern.compile(
-            "(Chapter\\s+\\d+[^\\n]*)(?=Chapter\\s+\\d+|$)",
-            Pattern.DOTALL | Pattern.CASE_INSENSITIVE
+    private static final Pattern EN_MARKER = Pattern.compile(
+            "^(Chapter\\s+\\d+[^\\n]*)", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
     );
 
     public List<ChapterResult> split(String fullText) {
-        if (fullText == null || fullText.isBlank()) {
-            return List.of();
-        }
+        if (fullText == null || fullText.isBlank()) return List.of();
+        String text = fullText.replace("\r\n", "\n").trim();
 
-        String cleaned = fullText.replace("\r\n", "\n").trim();
-
-        // Try Chinese chapter markers first
-        List<ChapterResult> chapters = splitByPattern(cleaned, CHAPTER_PATTERN);
-        if (chapters.size() >= 3) {
-            return chapters;
-        }
-
-        // Try English chapter markers
-        chapters = splitByPattern(cleaned, CHAPTER_PATTERN_EN);
-        if (chapters.size() >= 3) {
-            return chapters;
-        }
-
-        // Fallback: treat the entire text as one chapter
-        ChapterResult single = new ChapterResult(1, "全文", cleaned);
-        return List.of(single);
-    }
-
-    private List<ChapterResult> splitByPattern(String text, Pattern pattern) {
-        List<ChapterResult> chapters = new ArrayList<>();
-        Matcher matcher = pattern.matcher(text);
-
-        int index = 1;
-        while (matcher.find()) {
-            String content = matcher.group().trim();
-            if (content.length() < 50) continue; // skip empty/fragment chapters
-
-            String title = extractTitle(content);
-            chapters.add(new ChapterResult(index++, title, content));
-        }
-
-        // If regex didn't match, check if text just starts with a chapter marker
-        if (chapters.isEmpty()) {
-            Matcher firstMatch = Pattern.compile(
-                    "^\\s*(第[一二三四五六七八九十百千万零\\d]+章[^\\n]*|Chapter\\s+\\d+[^\\n]*)",
-                    Pattern.CASE_INSENSITIVE
-            ).matcher(text);
-
-            if (firstMatch.find()) {
-                // Manual split by chapter markers
-                String[] parts = text.split(
-                        "(?=第[一二三四五六七八九十百千万零\\d]+章|Chapter\\s+\\d+)",
-                        -1
-                );
-                int idx = 1;
-                for (String part : parts) {
-                    String trimmed = part.trim();
-                    if (trimmed.length() >= 50) {
-                        chapters.add(new ChapterResult(idx++, extractTitle(trimmed), trimmed));
-                    }
-                }
-            }
-        }
-
+        List<ChapterResult> chapters = splitByMarkers(text, CH_MARKER);
+        if (chapters.size() < 3) chapters = new ArrayList<>(splitByMarkers(text, EN_MARKER));
+        if (chapters.isEmpty()) chapters.add(new ChapterResult(1, "全文", text));
         return chapters;
     }
 
-    private String extractTitle(String content) {
-        // Extract first line as title
-        int newlineIdx = content.indexOf('\n');
-        if (newlineIdx > 0) {
-            return content.substring(0, newlineIdx).trim();
+    private List<ChapterResult> splitByMarkers(String text, Pattern markerPattern) {
+        // Find all marker positions
+        List<Integer> positions = new ArrayList<>();
+        List<String> titles = new ArrayList<>();
+        Matcher m = markerPattern.matcher(text);
+        while (m.find()) {
+            positions.add(m.start());
+            titles.add(m.group(1).trim());
         }
-        // If no newline, use first 50 chars
-        return content.length() > 50 ? content.substring(0, 50) + "..." : content;
+        if (positions.isEmpty()) return new ArrayList<>();
+
+        List<ChapterResult> chapters = new ArrayList<>();
+        for (int i = 0; i < positions.size(); i++) {
+            int start = positions.get(i);
+            int end = (i + 1 < positions.size()) ? positions.get(i + 1) : text.length();
+            String content = text.substring(start, end).trim();
+            if (content.length() >= 20) {
+                chapters.add(new ChapterResult(i + 1, titles.get(i), content));
+            }
+        }
+        return chapters;
     }
 
     public record ChapterResult(int number, String title, String content) {

@@ -45,7 +45,7 @@
     </div>
 
     <!-- Progress -->
-    <div v-if="gen" class="prog"><el-progress :percentage="100" :indeterminate="true" :stroke-width="2" :show-text="false"/></div>
+    <div v-if="gen" class="prog"><el-progress :percentage="progressPct" :stroke-width="2" :show-text="true"/><p class="prog-msg">{{ progressMsg }}</p></div>
 
     <!-- Chapters -->
     <div v-if="chapters.length" class="chaps">
@@ -78,7 +78,7 @@
         <div class="cb">
           <div v-if="!yaml&&!gen" class="emp"><el-empty description="点击「生成剧本」开始"/></div>
           <textarea v-else-if="edit" v-model="ey" class="ye" spellcheck="false"></textarea>
-          <div v-else class="yv"><pre v-html="hyFiltered"></pre></div>
+          <div v-else class="yv" :key="yaml" style="animation: revealYaml 0.4s ease-out"><pre v-html="hyFiltered"></pre></div>
         </div>
         <div v-if="edit" class="eb"><el-button size="small" @click="edit=false;ey=yaml">取消</el-button>
           <el-button size="small" type="primary" :loading="saveB" @click="svY">保存 (Ctrl+S)</el-button></div>
@@ -230,7 +230,7 @@ const route = useRoute(); const pid = route.params.id
 const projectTitle = ref(''); const projectStatus = ref('DRAFT')
 const originalText = ref(''); const chapters = ref([])
 const ac = ref(0); const splitting = ref(false)
-const gen = ref(false); const progressMsg = ref('')
+const gen = ref(false); const progressMsg = ref(''); const progressPct = ref(0)
 const yaml = ref(''); const latestVersion = ref(null)
 const edit = ref(false); const ey = ref(''); const saveB = ref(false)
 const vers = ref([]); const showHist = ref(false)
@@ -357,7 +357,7 @@ function doGen(){
           const ev=lines[i].replace('event:','').trim(),dl=lines[i+1]
           if(!dl?.startsWith('data:'))continue
           try{const d=JSON.parse(dl.replace('data:','').trim())
-            if(ev==='progress')progressMsg.value=d.message||''
+            if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
             else if(ev==='done'){yaml.value=d.yamlContent||'';latestVersion.value={id:d.versionId,versionNumber:d.versionNumber};projectStatus.value='COMPLETED';ElMessage.success('v'+d.versionNumber+' 生成成功')}
             else if(ev==='error'){ElMessage.error(d||'失败');gen.value=false}
           }catch{}
@@ -543,6 +543,9 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ychip:hover{color:var(--c-gold);border-color:var(--c-gold)}
 .ychip.on{background:var(--c-gold);color:var(--c-darker);border-color:var(--c-gold);font-weight:700}
 .ychip small{font-weight:400;opacity:0.7}
+
+/* YAML reveal animation */
+@keyframes revealYaml { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 9999px; } }
 
 /* Override highlight.js blue → gold */
 .yv :deep(.hljs-string){color:#e6c874}

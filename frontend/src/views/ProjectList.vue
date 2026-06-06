@@ -73,7 +73,7 @@
         </div>
 
         <!-- Project grid -->
-        <div v-if="filtered.length" class="grid">
+        <div v-if="filtered.length" class="grid stagger-in">
           <div v-for="p in filtered" :key="p.id" class="card" @click="$router.push(`/project/${p.id}`)">
             <div class="card-top-bar" :class="p.status.toLowerCase()"></div>
             <div class="card-inner">

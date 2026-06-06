@@ -50,7 +50,8 @@ public class ScriptService {
 
             projectService.updateChapterCount(projectId, chapters.size());
 
-            ScriptGenService.ScriptResult result = scriptGenService.generateScript(project.getOriginalText(), chapters);
+            ScriptGenService.ScriptResult result = scriptGenService.generateScript(
+                    project.getOriginalText(), chapters, p -> {});
             User user = userService.getById(userId);
 
             String yaml = yamlGeneratorService.generate(
@@ -99,17 +100,20 @@ public class ScriptService {
                 projectService.updateChapterCount(projectId, chapters.size());
                 send(emitter, "progress", Map.of("step", "split", "message", "识别到 " + chapters.size() + " 个章节", "totalChapters", chapters.size()));
 
-                // Extract characters first
-                send(emitter, "progress", Map.of("step", "characters", "message", "正在提取角色信息..."));
+                // Extract characters + generate scenes with progress
+                send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", 10));
 
-                ScriptGenService.ScriptResult result = scriptGenService.generateScript(project.getOriginalText(), chapters);
+                ScriptGenService.ScriptResult result = scriptGenService.generateScript(
+                        project.getOriginalText(), chapters,
+                        pct -> send(emitter, "progress", Map.of("step", "ai", "message", "AI 分析中...", "percent", pct))
+                );
 
                 int charCount = result.characters().size();
                 int sceneCount = result.scenes().size();
-                send(emitter, "progress", Map.of("step", "characters", "message", "提取到 " + charCount + " 个角色，共 " + sceneCount + " 个场景", "charCount", charCount, "sceneCount", sceneCount));
+                send(emitter, "progress", Map.of("step", "ai", "message", "提取到 " + charCount + " 个角色，" + sceneCount + " 个场景", "percent", 90));
 
                 // Generate YAML
-                send(emitter, "progress", Map.of("step", "yaml", "message", "正在生成 YAML 剧本..."));
+                send(emitter, "progress", Map.of("step", "yaml", "message", "生成 YAML 剧本...", "percent", 95));
 
                 User user = userService.getById(userId);
                 String yaml = yamlGeneratorService.generate(

@@ -57,24 +57,28 @@ public class ScriptGenService {
         this.objectMapper = objectMapper;
     }
 
-    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
+    public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters,
+                                         java.util.function.Consumer<Integer> onProgress) {
         List<Map<String, Object>> allCharacters = new CopyOnWriteArrayList<>();
         List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
+        int totalSteps = chapters.size() + 1; // characters + each chapter
+        java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger(0);
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        // Extract characters in parallel with first chapter
         futures.add(CompletableFuture.runAsync(() -> {
             allCharacters.addAll(extractCharacters(chapters.get(0).content(), chapters.get(0).number()));
+            int d = done.incrementAndGet();
+            onProgress.accept(10 + (d * 80 / totalSteps));
         }, executor));
 
-        // Process all chapters in parallel
         for (ChapterSplitService.ChapterResult chapter : chapters) {
             futures.add(CompletableFuture.runAsync(() -> {
-                // Wait a bit for characters to be extracted
                 List<Map<String, Object>> scenes = generateScenes(
                         chapter.content(), chapter.number(), allCharacters);
                 allScenes.addAll(scenes);
+                int d = done.incrementAndGet();
+                onProgress.accept(10 + (d * 80 / totalSteps));
                 log.info("Chapter {} done ({} scenes)", chapter.number(), scenes.size());
             }, executor));
         }
@@ -87,7 +91,6 @@ public class ScriptGenService {
             throw new RuntimeException("章节处理超时或失败", e);
         }
 
-        // Sort scenes by chapter number
         allScenes.sort((a, b) -> {
             int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
             int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
