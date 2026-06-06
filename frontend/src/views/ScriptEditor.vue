@@ -358,16 +358,27 @@ function doGen(){
           if(!dl?.startsWith('data:'))continue
           try{const d=JSON.parse(dl.replace('data:','').trim())
             if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
-            else if(ev==='done'){gen.value=false;ElMessage.success('v'+d.versionNumber+' 生成成功');loadGenResult()}
+            else if(ev==='done'){
+              // Use SSE data immediately if available
+              if(d.yamlContent){
+                yaml.value=d.yamlContent
+                latestVersion.value={id:d.versionId,versionNumber:d.versionNumber}
+                projectStatus.value='COMPLETED'
+              }
+              gen.value=false;ElMessage.success('v'+d.versionNumber+' 生成成功')
+              // Always fetch from API as backup (handles missing SSE data)
+              fetchGenResult()
+            }
             else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
           }catch(e){console.warn('SSE parse:',e,dl?.substring(0,80))}
         }
       }
       function rd(){reader.read().then(({done,value})=>{
         if(done){
-          // Process any remaining data in buffer before finishing
           if(buf.trim()){const lines=buf.split('\n');processLines(lines)}
-          gen.value=false;return
+          // If gen is still true, 'done' event was missed — fetch from API
+          if(gen.value){fetchGenResult();gen.value=false}
+          return
         }
         buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop()||''
         processLines(lines)
@@ -377,16 +388,21 @@ function doGen(){
     }).catch(e=>{ElMessage.error('连接失败');gen.value=false})
 }
 
-// Fetch latest version after generation (more reliable than SSE data)
-async function loadGenResult(){
-  try{
-    const v=await getLatest(pid)
-    if(v.data.data){
-      yaml.value=v.data.data.yamlContent||''
-      latestVersion.value=v.data.data
-      projectStatus.value='COMPLETED'
-    }
-  }catch(e){console.error('loadGenResult:',e)}
+// Fetch latest version after generation (backup for SSE data)
+async function fetchGenResult(){
+  // Retry up to 3 times with delay, in case DB hasn't committed yet
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      await new Promise(r=>setTimeout(r,500))
+      const v=await getLatest(pid)
+      if(v.data.data?.yamlContent){
+        yaml.value=v.data.data.yamlContent
+        latestVersion.value={id:v.data.data.id,versionNumber:v.data.data.versionNumber}
+        projectStatus.value='COMPLETED'
+        return
+      }
+    }catch(e){console.warn('fetchGenResult attempt '+attempt, e)}
+  }
 }
 
 // YAML edit
