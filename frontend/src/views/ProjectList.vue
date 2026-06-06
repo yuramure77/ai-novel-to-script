@@ -2,7 +2,7 @@
   <div class="app">
     <header class="topbar">
       <div class="tl">
-        <router-link to="/" class="logo">🎬 剧本工坊</router-link>
+        <router-link to="/" class="logo">🎬 剧本工坊1</router-link>
         <span class="nav-slogan">从文字到银幕，只差一个回车</span>
       </div>
       <div class="tr">

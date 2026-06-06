@@ -7,7 +7,7 @@
     <div class="login-card">
       <div class="brand">
         <div class="clapper">🎬</div>
-        <h1>剧本工坊</h1>
+        <h1>剧本工坊1</h1>
         <p class="slogan">从文字到银幕，只差一个回车</p>
       </div>
 
