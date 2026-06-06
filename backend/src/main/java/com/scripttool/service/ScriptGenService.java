@@ -136,15 +136,16 @@ public class ScriptGenService {
         int start = 0;
         while (start < text.length()) {
             int end = Math.min(start + size, text.length());
-            if (end < text.length()) {
+            if (end < text.length() && end > start) {
                 // Try to break at sentence end
                 int brk = text.lastIndexOf("。", end);
-                if (brk > start + size / 2) end = brk + 1;
+                if (brk > start) end = brk + 1;
                 else {
                     brk = text.lastIndexOf("\n", end);
-                    if (brk > start + size / 2) end = brk;
+                    if (brk > start) end = brk;
                 }
             }
+            if (end <= start) end = Math.min(start + size, text.length());
             parts.add(text.substring(start, end).trim());
             start = end;
         }
