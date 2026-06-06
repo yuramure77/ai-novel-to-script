@@ -363,7 +363,7 @@ function doGen(){
       function processLines(lines){
         for(let i=0;i<lines.length;i++){
           if(!lines[i].startsWith('event:'))continue
-          const dl=lines[i+1]
+          const ev=lines[i].replace('event:','').trim(), dl=lines[i+1]
           // If data line is in the next chunk, put event line back in buffer
           if(!dl?.startsWith('data:')){
             buf = lines.slice(i).join('\n') + (buf?'\n'+buf:'')
