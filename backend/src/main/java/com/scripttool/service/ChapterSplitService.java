@@ -11,7 +11,7 @@ public class ChapterSplitService {
 
     // Split on line-start chapter markers: ^第X章
     private static final Pattern CH_MARKER = Pattern.compile(
-            "^(第[一二三四五六七八九十百千万零\\d]+章[^\\n]*)", Pattern.MULTILINE
+            "^[ \\t]*(第[一二三四五六七八九十百千万零\\d]+章[^\\n]*)", Pattern.MULTILINE
     );
     private static final Pattern EN_MARKER = Pattern.compile(
             "^(Chapter\\s+\\d+[^\\n]*)", Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
