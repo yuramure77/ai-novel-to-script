@@ -64,7 +64,7 @@
 
       <!-- Center: YAML -->
       <div class="col cc" :class="{wide:!showR}">
-        <div class="ct"><span>📄 剧本</span>
+        <div class="ct"><span>📄 剧本 1</span>
           <div><el-button size="small" text @click="edit=!edit">{{edit?'预览':'编辑'}}</el-button>
             <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button></div>
         </div>
@@ -523,7 +523,7 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ch:hover{color:var(--color-primary);border-color:var(--color-primary)}
 .ch.on{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
-.col{display:flex;flex-direction:column;background:var(--color-surface)}
+.col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .cl{width:30%;min-width:260px;border-right:1px solid var(--color-border)}
 .cc{width:45%;border-right:1px solid var(--color-border)}
 .cc.wide{width:70%}
@@ -656,7 +656,7 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
   .chaps{padding:4px 10px}
   .ch{font-size:10px;padding:2px 8px}
   .main{flex-direction:column;overflow:visible;gap:16px;padding:10px 0}
-  .cl,.cc,.cr{width:100%!important;min-width:auto!important;max-height:45vh;border-right:none;border-radius:var(--radius-lg);border:1px solid var(--color-border);overflow:hidden;background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .cl,.cc,.cr{width:100%!important;min-width:auto!important;max-height:45vh;border-right:none;border-radius:var(--radius-lg);border:1px solid var(--color-border);overflow:hidden;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
   .cr{max-height:none}
   .toggle-r{display:none}
   .col-title{font-size:11px;padding:5px 10px}
