@@ -304,17 +304,32 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   font-family: var(--font-mono); background: rgba(212,168,83,0.06)
 }
 :deep(.el-dialog__body) { max-height: 60vh; overflow-y: auto; }
+/* Apple-style frosted glass overlay */
 :deep(.el-overlay-dialog) {
   position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
   display: flex !important; align-items: center !important; justify-content: center !important;
-  background: rgba(0,0,0,0.3) !important;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.2) !important;
+  backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
+/* Apple-style frosted glass dialog */
 :deep(.el-dialog) {
-  background: rgba(30,28,26,0.88) !important;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(212,168,83,0.15) !important;
-  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 80px rgba(212,168,83,0.08) !important;
+  background: rgba(28,28,30,0.65) !important;
+  backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 2px 0 rgba(255,255,255,0.06) inset,
+    0 0 0 0.5px rgba(255,255,255,0.08),
+    0 8px 40px rgba(0,0,0,0.4),
+    0 32px 80px rgba(0,0,0,0.3) !important;
+}
+:deep(.el-dialog__header) {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+:deep(.el-dialog__footer) {
+  background: transparent !important;
+  border-top: 1px solid rgba(255,255,255,0.06);
 }
 @media (max-width: 768px) {
   :deep(.el-dialog) {
