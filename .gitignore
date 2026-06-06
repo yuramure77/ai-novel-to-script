@@ -36,3 +36,6 @@ application-local.yml
 
 # Build output
 backend/src/main/resources/static/
+
+# Claude local memory
+CLAUDE.md
