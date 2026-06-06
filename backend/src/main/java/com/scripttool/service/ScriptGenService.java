@@ -20,7 +20,7 @@ public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int CHUNK_SIZE = 500;   // Characters per AI call — small=fast first response
+    private static final int CHUNK_SIZE = 1000;  // Characters per AI call
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
