@@ -12,18 +12,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Service
 public class ScriptGenService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptGenService.class);
     private static final int MAX_RETRIES = 2;
-    private static final int PARALLEL_CHAPTERS = 3;
+    private static final int PARALLEL_CHAPTERS = 4;
+    private static final int CHUNK_SIZE = 3500;      // chars per AI call — small enough for quality
+    private static final int CHUNK_OVERLAP = 400;     // overlap to maintain context across chunks
 
     private final DeepSeekConfig config;
     private final RestTemplate restTemplate;
@@ -31,7 +32,7 @@ public class ScriptGenService {
     private final ExecutorService executor = Executors.newFixedThreadPool(PARALLEL_CHAPTERS);
 
     private static final String SYSTEM_PROMPT = """
-你是一个专业的剧本改编助手。你需要将小说章节转换为结构化的剧本格式。
+你是一个专业的剧本改编助手。你需要将小说文本转换为结构化的剧本格式。
 
 转换规则：
 1. 角色的 name 使用原文中的角色名
@@ -57,28 +58,35 @@ public class ScriptGenService {
         this.objectMapper = objectMapper;
     }
 
-    private static final int MAX_TEXT_LENGTH = 8000; // chars per AI call
-
+    /**
+     * Main entry: generate script from chapters.
+     * Uses chunked parallel processing for long chapters.
+     */
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters) {
-        // Extract characters from first 3 chapters (or all if fewer), truncated
+        // Extract characters from first 3 chapters (sampled)
         StringBuilder sample = new StringBuilder();
         int toSample = Math.min(3, chapters.size());
         for (int i = 0; i < toSample; i++) {
             String content = chapters.get(i).content();
-            if (content.length() > MAX_TEXT_LENGTH) {
-                content = content.substring(0, MAX_TEXT_LENGTH);
+            if (content.length() > CHUNK_SIZE * 2) {
+                content = content.substring(0, CHUNK_SIZE * 2);
             }
             sample.append(content).append("\n\n");
         }
-        List<Map<String, Object>> allCharacters = extractCharacters(
-                truncate(sample.toString()), chapters.get(0).number());
+        List<Map<String, Object>> allCharacters = extractCharacters(sample.toString(), chapters.get(0).number());
+        log.info("Extracted {} characters", allCharacters.size());
+
+        // Process chapters in parallel, each chapter may be chunked
         List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (ChapterSplitService.ChapterResult chapter : chapters) {
             futures.add(CompletableFuture.runAsync(() -> {
-                allScenes.addAll(generateScenes(chapter.content(), chapter.number(), allCharacters));
-                log.info("Chapter {} done", chapter.number());
+                List<Map<String, Object>> chapterScenes = generateChapterScenes(
+                        chapter.content(), chapter.number(), allCharacters);
+                allScenes.addAll(chapterScenes);
+                log.info("Chapter {} done — {} scenes from {} chars",
+                        chapter.number(), chapterScenes.size(), chapter.content().length());
             }, executor));
         }
 
@@ -87,9 +95,10 @@ public class ScriptGenService {
                     .get(5, TimeUnit.MINUTES);
         } catch (Exception e) {
             log.error("Processing failed", e);
-            throw new RuntimeException("处理失败", e);
+            throw new RuntimeException("处理失败: " + e.getMessage(), e);
         }
 
+        // Sort scenes: by chapter, then scene_number
         allScenes.sort((a, b) -> {
             int ca = ((Number) a.getOrDefault("chapter", 0)).intValue();
             int cb = ((Number) b.getOrDefault("chapter", 0)).intValue();
@@ -101,28 +110,99 @@ public class ScriptGenService {
         return new ScriptResult(allCharacters, allScenes);
     }
 
-    private List<Map<String, Object>> extractCharacters(String text, int chapterNum) {
-        String prompt = String.format("请提取以下小说文本中的全部角色信息（第%d章）：\n\n%s", chapterNum, text);
-        String response = callWithRetry(prompt);
-        Map<String, Object> result = parseJsonResponse(response);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> chars = (List<Map<String, Object>>) result.getOrDefault("characters", List.of());
-        return chars;
+    /**
+     * Generate scenes for one chapter. If the chapter is long, split into
+     * overlapping chunks, process in parallel, then merge.
+     */
+    private List<Map<String, Object>> generateChapterScenes(
+            String text, int chapterNum, List<Map<String, Object>> chars) {
+
+        // If text is short enough, process as a single chunk
+        if (text.length() <= CHUNK_SIZE) {
+            return generateScenesSingle(text, chapterNum, chars, 1);
+        }
+
+        // Split into overlapping chunks
+        List<String> chunks = splitIntoChunks(text);
+        log.info("Chapter {} split into {} chunks ({} chars total)", chapterNum, chunks.size(), text.length());
+
+        // Process chunks in parallel
+        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
+        AtomicInteger chunkIdx = new AtomicInteger(0);
+        List<CompletableFuture<Void>> chunkFutures = new ArrayList<>();
+
+        for (int i = 0; i < chunks.size(); i++) {
+            final int idx = i;
+            final String chunk = chunks.get(i);
+            chunkFutures.add(CompletableFuture.runAsync(() -> {
+                List<Map<String, Object>> scenes = generateScenesSingle(
+                        chunk, chapterNum, chars, idx + 1);
+                allScenes.addAll(scenes);
+            }, executor));
+        }
+
+        try {
+            CompletableFuture.allOf(chunkFutures.toArray(new CompletableFuture[0]))
+                    .get(3, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("Chapter {} chunk processing failed", chapterNum, e);
+        }
+
+        // Merge and deduplicate scenes
+        List<Map<String, Object>> merged = mergeAndDeduplicate(allScenes);
+        // Renumber scenes within chapter
+        for (int i = 0; i < merged.size(); i++) {
+            merged.get(i).put("scene_number", i + 1);
+            merged.get(i).put("chapter", chapterNum);
+        }
+        return merged;
     }
 
-    private String truncate(String text) {
-        return text.length() > MAX_TEXT_LENGTH ? text.substring(0, MAX_TEXT_LENGTH) : text;
+    /**
+     * Split text into overlapping chunks for parallel processing
+     */
+    private List<String> splitIntoChunks(String text) {
+        List<String> chunks = new ArrayList<>();
+        int start = 0;
+        while (start < text.length()) {
+            int end = Math.min(start + CHUNK_SIZE, text.length());
+            // Try to break at sentence/paragraph boundary
+            if (end < text.length()) {
+                int brk = findBreakPoint(text, end);
+                if (brk > start + CHUNK_SIZE / 2) end = brk;
+            }
+            chunks.add(text.substring(start, end).trim());
+            start = end - CHUNK_OVERLAP;
+            if (start >= text.length() - 100) break;
+        }
+        return chunks;
     }
 
-    private List<Map<String, Object>> generateScenes(String text, int chapterNum, List<Map<String, Object>> chars) {
+    private int findBreakPoint(String text, int around) {
+        // Look for paragraph break, sentence end, or newline near the target
+        for (int d = 200; d >= 0; d--) {
+            int pos = around - d;
+            if (pos > 0 && pos < text.length()) {
+                char c = text.charAt(pos);
+                if (c == '\n' && pos + 1 < text.length() && text.charAt(pos + 1) == '\n') return pos;
+                if (c == '。' || c == '！' || c == '？' || c == '"' || c == '」') return pos + 1;
+            }
+        }
+        return around;
+    }
+
+    /**
+     * Generate scenes from a single chunk of text
+     */
+    private List<Map<String, Object>> generateScenesSingle(
+            String text, int chapterNum, List<Map<String, Object>> chars, int chunkIdx) {
         String hint = chars.isEmpty() ? "暂无" : chars.stream()
                 .map(c -> c.get("name").toString())
+                .limit(20) // Limit character list to keep prompt concise
                 .reduce((a, b) -> a + ", " + b).orElse("暂无");
-        // Truncate long chapter texts to fit AI context window
-        String truncated = truncate(text);
         String prompt = String.format(
-                "请将以下小说章节转换为剧本场景（第%d章）\n\n已知角色：%s\n\n章节原文：%s",
-                chapterNum, hint, truncated);
+                "请将以下小说文本转换为剧本场景（第%d章第%d部分）\n\n已知角色：%s\n\n原文：%s",
+                chapterNum, chunkIdx, hint, text);
         String response = callWithRetry(prompt);
         Map<String, Object> result = parseJsonResponse(response);
         @SuppressWarnings("unchecked")
@@ -133,13 +213,52 @@ public class ScriptGenService {
         return scenes;
     }
 
+    /**
+     * Merge scenes from multiple chunks: deduplicate by title/content similarity
+     */
+    private List<Map<String, Object>> mergeAndDeduplicate(List<Map<String, Object>> scenes) {
+        if (scenes.size() <= 1) return new ArrayList<>(scenes);
+
+        List<Map<String, Object>> merged = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (Map<String, Object> scene : scenes) {
+            String title = Objects.toString(scene.getOrDefault("description", ""), "");
+            String loc = Objects.toString(scene.getOrDefault("location", ""), "");
+            String key = (title + "|" + loc).trim();
+            // Skip if very similar scene already exists
+            if (!key.isBlank() && !seen.add(key)) continue;
+            merged.add(scene);
+        }
+        return merged;
+    }
+
+    /**
+     * Extract characters from sample text
+     */
+    private List<Map<String, Object>> extractCharacters(String text, int chapterNum) {
+        String prompt = String.format(
+                "请提取以下小说文本中的全部角色信息：\n\n%s\n\n请返回所有角色，包括次要角色。", text);
+        String response = callWithRetry(prompt);
+        Map<String, Object> result = parseJsonResponse(response);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> chars = (List<Map<String, Object>>) result.getOrDefault("characters", List.of());
+        // Deduplicate by name
+        Set<String> names = new HashSet<>();
+        return chars.stream()
+                .filter(c -> names.add(Objects.toString(c.get("name"), "")))
+                .collect(Collectors.toList());
+    }
+
+    // ============ API communication ============
+
     private String callWithRetry(String userPrompt) {
         Exception lastEx = null;
         for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
                 if (attempt > 0) {
                     log.info("Retry {} for DeepSeek API", attempt);
-                    Thread.sleep(1000L * attempt);
+                    Thread.sleep(2000L * attempt);
                 }
                 return callDeepSeek(userPrompt);
             } catch (RestClientException e) {

@@ -34,7 +34,7 @@ deepseek:
   api-key: ${DEEPSEEK_API_KEY}
   api-url: https://api.deepseek.com/v1/chat/completions
   model: deepseek-chat
-  max-tokens: 4096
+  max-tokens: 8192
   temperature: 0.7
 
 jwt:
