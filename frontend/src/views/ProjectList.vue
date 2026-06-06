@@ -108,7 +108,7 @@
     </div>
 
     <!-- Create dialog -->
-    <el-dialog v-model="showCreate" title="新建项目" :width="dialogWidth" :close-on-click-modal="false">
+    <el-dialog v-model="showCreate" title="新建项目" :width="dialogWidth" :close-on-click-modal="false" :append-to-body="false">
       <el-form :model="form" :rules="rules" ref="fr" label-position="top">
         <el-form-item label="项目名称" prop="title">
           <el-input v-model="form.title" placeholder="如：《三体》改编剧本" size="large" />
