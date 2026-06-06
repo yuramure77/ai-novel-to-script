@@ -299,19 +299,19 @@ watch(yaml,()=>{
 // Parse characters from YAML
 watch(yaml,()=>{
   try{
-    const out=[]; let cur=null
-    for(const l of yaml.value.split('\n')){
-      if(l.startsWith('characters:'))continue
-      if(/^\w/.test(l)&&!l.startsWith('  '))break
-      const nm=l.match(/^\s{2}-\s*name:\s*"?([^"\n]+)/)
-      if(nm){if(cur)out.push(cur);cur={name:nm[1].trim()}}
-      else if(cur){
-        const r=l.match(/role:\s*"?(\w+)/);if(r)cur.role=r[1]
-        const d=l.match(/description:\s*"?([^"\n]+)/);if(d)cur.description=d[1]
-        const t=l.match(/^\s{6}-\s*"?([^"\n]+)/);if(t){cur.traits??=[];cur.traits.push(t[1])}
-      }
+    const out=[]; let cur=null; const lines=yaml.value.split('\n')
+    for(let i=0;i<lines.length;i++){
+      const l=lines[i]
+      // Match any indented name: field under characters list
+      const nm=l.match(/^\s+-\s+name:\s*"?([^"\n]+)/)
+      if(nm){if(cur)out.push(cur);cur={name:nm[1].trim()};continue}
+      if(!cur)continue
+      const r=l.match(/^\s+role:\s*"?(\w+)/);if(r)cur.role=r[1]
+      const d=l.match(/^\s+description:\s*"?([^"\n]+)/);if(d)cur.description=d[1].replace(/^"|"$/g,'')
+      const t=l.match(/^\s+-\s*"?([^"\n]+)/);if(t&&!l.includes('name:')&&!l.includes('role:')&&!l.includes('description:')&&!l.includes('first_appearance:')&&!l.includes('id:')){cur.traits??=[];cur.traits.push(t[1].replace(/^"|"$/g,'').trim())}
     }
-    if(cur)out.push(cur); chars.value = out
+    if(cur)out.push(cur)
+    chars.value=out.filter(c=>c.name)
   }catch{}
 })
 

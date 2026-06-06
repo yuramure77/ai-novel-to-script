@@ -47,6 +47,24 @@ public class ExportController {
         writeFile(response, v.getYamlContent(), "script_v" + v.getVersionNumber() + ".txt", "text/plain");
     }
 
+    @GetMapping("/{versionId}/docx")
+    public void exportDocx(@PathVariable Long versionId, HttpServletResponse response) throws IOException {
+        ScriptVersion v = versionRepo.findById(versionId).orElse(null);
+        if (v == null) { response.setStatus(404); return; }
+        byte[] docx = exportService.yamlToDocx(v.getYamlContent());
+        response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=script_v" + v.getVersionNumber() + ".docx");
+        response.getOutputStream().write(docx);
+    }
+
+    @GetMapping("/{versionId}/html")
+    public void exportHtml(@PathVariable Long versionId, HttpServletResponse response) throws IOException {
+        ScriptVersion v = versionRepo.findById(versionId).orElse(null);
+        if (v == null) { response.setStatus(404); return; }
+        writeFile(response, exportService.yamlToHtml(v.getYamlContent()),
+                "script_v" + v.getVersionNumber() + ".html", "text/html; charset=UTF-8");
+    }
+
     @GetMapping("/{versionId}/preview")
     public ResponseEntity<ApiResponse<?>> preview(@PathVariable Long versionId) {
         ScriptVersion v = versionRepo.findById(versionId).orElse(null);

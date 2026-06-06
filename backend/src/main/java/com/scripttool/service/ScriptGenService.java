@@ -36,7 +36,7 @@ public class ScriptGenService {
 转换规则：
 1. 角色的 name 使用原文中的角色名
 2. role 取值为: protagonist(主角), antagonist(反派), supporting(配角), minor(次要)
-3. scene type 取值为: INT(室内), EXT(室外), INT/EXT(内外交替)
+3. scene type 取值为: INT(室内) / EXT(室外) / INT/EXT(内外交替)，说明场景拍摄环境
 4. beat type 取值为: action(动作/场景描写), dialogue(对白), monologue(独白/内心), narration(旁白), transition(转场)
 5. character 字段仅在 beat type 为 dialogue 或 monologue 时需要填写
 6. direction 是表演指导/舞台说明，用中文写
