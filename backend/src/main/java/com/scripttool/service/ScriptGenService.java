@@ -59,18 +59,18 @@ public class ScriptGenService {
 
     public ScriptResult generateScript(String fullText, List<ChapterSplitService.ChapterResult> chapters,
                                          java.util.function.Consumer<Integer> onProgress) {
-        List<Map<String, Object>> allCharacters = new CopyOnWriteArrayList<>();
-        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
-        int totalSteps = chapters.size() + 1; // characters + each chapter
+        int totalSteps = chapters.size() + 1;
         java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger(0);
 
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        // Step 1: Extract characters first (fast, single API call)
+        List<Map<String, Object>> allCharacters = extractCharacters(
+                chapters.get(0).content(), chapters.get(0).number());
+        done.incrementAndGet();
+        onProgress.accept(10 + (done.get() * 80 / totalSteps));
 
-        futures.add(CompletableFuture.runAsync(() -> {
-            allCharacters.addAll(extractCharacters(chapters.get(0).content(), chapters.get(0).number()));
-            int d = done.incrementAndGet();
-            onProgress.accept(10 + (d * 80 / totalSteps));
-        }, executor));
+        // Step 2: Process all chapters in parallel
+        List<Map<String, Object>> allScenes = new CopyOnWriteArrayList<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (ChapterSplitService.ChapterResult chapter : chapters) {
             futures.add(CompletableFuture.runAsync(() -> {
