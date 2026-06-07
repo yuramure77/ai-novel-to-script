@@ -107,10 +107,10 @@
         <!-- Project grid -->
         <div v-if="filtered.length" class="grid stagger-in">
           <div v-for="p in filtered" :key="p.id" :class="['card', {selected: selectedIds.has(p.id)}]" @click="onCard(p)">
-            <div class="card-check" @click.stop="toggleSel(p.id)"><span v-if="selectedIds.has(p.id)">✓</span></div>
             <div class="card-top-bar" :class="p.status.toLowerCase()"></div>
             <div class="card-inner">
               <div class="card-head">
+                <div class="card-check" @click.stop="toggleSel(p.id)"><span v-if="selectedIds.has(p.id)">✓</span></div>
                 <h3>{{ p.title }}</h3>
                 <el-tag size="small" round :type="(p.isOwner || p.ownerId === userId || (p.permission||'READ')==='ADMIN')?'warning':'info'">
                   {{ (p.isOwner || p.ownerId === userId) ? '👑 创建者' : (p.permission||'READ')==='ADMIN'?'🔧 管理员':'👁 只读' }}
@@ -364,12 +364,12 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .batch-actions { margin-left: auto; display: flex; gap: 8px }
 
 .card-check {
-  position: absolute; top: 8px; left: 10px; z-index: 2;
-  width: 22px; height: 22px; border: 2px solid var(--color-border);
-  border-radius: 4px; background: var(--color-surface);
+  flex-shrink: 0; width: 22px; height: 22px; border: 2px solid var(--color-border);
+  border-radius: 4px; background: var(--color-surface); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; color: var(--c-darker); transition: all var(--transition);
+  font-size: 13px; color: var(--c-darker); transition: all var(--transition); margin-top: 1px
 }
+.card-check:hover { border-color: var(--c-gold) }
 .card.selected .card-check { background: var(--c-gold); border-color: var(--c-gold) }
 .card.selected { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) }
 .rf-btn {
