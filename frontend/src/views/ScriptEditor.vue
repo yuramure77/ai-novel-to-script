@@ -175,27 +175,44 @@
             </div>
           </el-tab-pane>
 
-          <!-- Scene images carousel -->
+          <!-- Scene images gallery -->
           <el-tab-pane label="场景图" name="scenes">
             <div class="scenes">
               <div v-if="sceneImgs.length">
-                <el-carousel :interval="4000" arrow="always" height="220px" indicator-position="outside">
-                  <el-carousel-item v-for="(s,i) in sceneImgs" :key="i">
-                    <div class="carousel-slide">
-                      <div class="simgt">场景 {{ i+1 }}: {{ s.title }}</div>
-                      <img v-if="s.image" :src="s.image" class="simg" @click="previewImg(s.image, s.prompt)" title="点击放大查看" />
-                      <div v-else class="simgplc" @click="genScnImg(s,i)">点击生成场景图</div>
-                      <div class="scene-actions">
-                        <el-button size="small" text @click="genScnImg(s,i)" v-if="!s.image">AI 生成</el-button>
-                        <template v-if="s.image">
-                          <el-button size="small" text type="warning" @click="genScnImg(s,i)">🔄 重新生成</el-button>
-                          <el-button size="small" text @click="showImgVer('SCENE', i)">📋 历史</el-button>
-                        </template>
+                <div class="scene-gallery-header">
+                  <span>🎬 {{ sceneImgs.length }} 个场景</span>
+                  <el-button size="small" type="warning" @click="genAllScenes" :loading="genAllScenesBusy" :disabled="isReadOnly">
+                    🎨 批量生成全部场景图
+                  </el-button>
+                </div>
+                <div class="scene-cards">
+                  <div v-for="(s,i) in sceneImgs" :key="i" class="scene-card">
+                    <div class="scene-card-img" @click="s.image ? previewImg(s.image, s.prompt) : genScnImg(s,i)">
+                      <img v-if="s.image" :src="s.image" />
+                      <div v-else class="scene-card-placeholder">
+                        <span>🎥</span>
+                        <span>点击生成</span>
+                      </div>
+                      <div class="scene-card-overlay">
+                        <span>{{ s.image ? '🔍 放大' : '🎨 生成' }}</span>
                       </div>
                     </div>
-                  </el-carousel-item>
-                </el-carousel>
-                <p style="font-size:11px;color:var(--color-text-muted);text-align:center;margin-top:8px">💡 点击图片放大 · 点击按钮重新生成</p>
+                    <div class="scene-card-info">
+                      <div class="scene-card-num">场景 {{ i+1 }}</div>
+                      <div class="scene-card-title">{{ s.title || '未命名场景' }}</div>
+                      <div class="scene-card-meta">
+                        <span v-if="s.location">📍 {{ s.location }}</span>
+                        <span v-if="s.time">🕐 {{ s.time }}</span>
+                      </div>
+                      <div class="scene-card-actions">
+                        <el-button size="small" text type="warning" @click="genScnImg(s,i)" :loading="false">
+                          {{ s.image ? '🔄' : '🎨' }} {{ s.image ? '重新生成' : 'AI 生成' }}
+                        </el-button>
+                        <el-button v-if="s.image" size="small" text @click="showImgVer('SCENE', i)">📋</el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <el-empty v-else description="生成剧本后可预览场景图" />
             </div>
@@ -619,6 +636,28 @@ async function genScnImg(s,i){
   }catch{ElMessage.error('生成失败')}
 }
 
+// Batch generate all scene images
+const genAllScenesBusy = ref(false)
+async function genAllScenes() {
+  genAllScenesBusy.value = true
+  let done = 0
+  for (let i = 0; i < sceneImgs.value.length; i++) {
+    if (!sceneImgs.value[i].image) {
+      try {
+        const s = sceneImgs.value[i]
+        const r = await api.post('/ai/image/scene', {
+          projectId: Number(pid), sceneIndex: i,
+          description: s.description, location: s.location, time: s.time, mood: ''
+        })
+        sceneImgs.value[i] = { ...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt }
+        done++
+      } catch { /* skip failed, continue next */ }
+    }
+  }
+  genAllScenesBusy.value = false
+  ElMessage.success(`已生成 ${done} 张场景图`)
+}
+
 // Research
 async function doSrch(){
   if(!rq.value.trim())return;srching.value=true
@@ -672,14 +711,14 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .tbl h2{font-size:15px;margin:0;color:var(--color-text);font-weight:600;cursor:pointer}
 .tbr{display:flex;align-items:center;gap:6px}
 .sbar{padding:8px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border);flex-shrink:0}
-.act{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border-light);flex-shrink:0}
-.actl{display:flex;align-items:center;gap:10px}
+.act{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border);flex-shrink:0}
+.actl{display:flex;align-items:center;gap:12px}
 .hint{color:var(--color-text-muted);font-size:11px}
-.prog{padding:6px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border-light);flex-shrink:0}
-.chaps{display:flex;gap:4px;padding:6px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border-light);overflow-x:auto;flex-shrink:0}
-.ch{flex-shrink:0;padding:3px 10px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);font-size:11px;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;transition:all var(--transition)}
-.ch:hover{color:var(--color-primary);border-color:var(--color-primary)}
-.ch.on{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
+.prog{padding:8px 14px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border-light);flex-shrink:0}
+.chaps{display:flex;gap:6px;padding:8px 12px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border-light);overflow-x:auto;flex-shrink:0;align-items:center}
+.ch{flex-shrink:0;padding:4px 14px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;transition:all .2s ease;font-family:var(--font-serif)}
+.ch:hover{color:var(--c-gold);border-color:var(--c-gold);box-shadow:0 0 8px rgba(212,168,83,0.15)}
+.ch.on{background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(212,168,83,0.3)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
 .col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .cl{width:30%;min-width:260px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
@@ -779,15 +818,24 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ccard p{padding:0 10px;font-size:12px;color:var(--color-text-secondary);margin:0 0 4px}
 .ctraits{display:flex;gap:4px;flex-wrap:wrap;padding:0 10px 8px}
 
-/* Scene carousel */
-.scenes{padding:10px;overflow:auto;height:100%}
-.scenes :deep(.el-carousel__container){height:200px!important}
-.scenes :deep(.el-carousel__arrow){background:var(--color-surface)!important;color:var(--c-gold)!important}
-.carousel-slide{text-align:center;padding:4px}
-.simgt{font-size:12px;color:var(--color-text-secondary);margin-bottom:6px}
-.simg{width:100%;height:160px;object-fit:cover;border-radius:var(--radius);cursor:pointer}
-.simgplc{width:100%;height:120px;background:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--color-text-muted);cursor:pointer;border-radius:var(--radius);border:2px dashed var(--color-border)}
-.simgplc:hover{background:var(--color-surface-hover);border-color:var(--c-gold)}
+/* Scene gallery */
+.scenes{padding:10px 14px;overflow-y:auto;height:100%}
+.scene-gallery-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;color:var(--color-text-secondary)}
+.scene-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.scene-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;transition:all var(--transition)}
+.scene-card:hover{border-color:var(--c-gold);box-shadow:0 4px 16px rgba(212,168,83,0.12);transform:translateY(-2px)}
+.scene-card-img{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;cursor:pointer;background:var(--color-bg)}
+.scene-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .3s ease}
+.scene-card:hover .scene-card-img img{transform:scale(1.05)}
+.scene-card-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:24px;color:var(--color-text-muted);border:2px dashed var(--color-border)}
+.scene-card-placeholder span:last-child{font-size:12px}
+.scene-card-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s ease;color:#fff;font-size:14px;font-weight:600}
+.scene-card-img:hover .scene-card-overlay{opacity:1}
+.scene-card-info{padding:10px 12px}
+.scene-card-num{font-size:10px;color:var(--c-gold);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.scene-card-title{font-size:13px;font-weight:600;color:var(--color-text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scene-card-meta{display:flex;gap:8px;font-size:11px;color:var(--color-text-muted);margin-bottom:6px}
+.scene-card-actions{display:flex;gap:4px;justify-content:flex-end}
 
 /* Research */
 .research{padding:10px}
