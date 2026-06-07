@@ -7,8 +7,14 @@ Type=simple
 User=root
 WorkingDirectory=/opt/ai-novel-to-script
 Environment=DEEPSEEK_API_KEY=请替换为你的真实API密钥
+Environment=TOKENHUB_API_KEY=请替换为你的TokenHub密钥
 Environment=PORT=8080
 Environment=H2_PATH=/opt/ai-novel-to-script/data/scripttool
+# 以下COS配置为可选，不配则图片直接返回TokenHub临时URL
+Environment=TENCENT_SECRET_ID=
+Environment=TENCENT_SECRET_KEY=
+Environment=COS_BUCKET=
+Environment=COS_REGION=ap-guangzhou
 ExecStart=/usr/bin/java -Xmx1024m -jar /opt/ai-novel-to-script/app.jar
 Restart=always
 RestartSec=5
