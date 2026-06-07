@@ -237,9 +237,23 @@ npm run dev
 | POST | `/api/projects/{id}/collaborators` | 添加协作者 |
 | PUT | `/api/projects/{id}/collaborators/{cid}` | 修改权限 |
 | DELETE | `/api/projects/{id}/collaborators/{cid}` | 移除协作者 |
+| POST | `/api/projects/{id}/invite-link` | 生成邀请链接 |
+| POST | `/api/collaborations/join` | 通过邀请链接加入 |
+| GET | `/api/projects/{id}/active-users` | 活跃用户列表 |
 | GET | `/api/projects/shared` | 分享给我的项目 |
 
-### AI 生图接口（需 Bearer Token）
+### 导出接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/export/{versionId}/yaml` | 下载 YAML |
+| GET | `/api/export/{versionId}/markdown` | 下载 Markdown |
+| GET | `/api/export/{versionId}/fountain` | 下载 Fountain |
+| GET | `/api/export/{versionId}/txt` | 下载 TXT |
+| GET | `/api/export/{versionId}/docx` | 下载 DOCX |
+| GET | `/api/export/{versionId}/html` | 下载 HTML |
+
+### AI 生图与搜索（需 Bearer Token）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -247,6 +261,14 @@ npm run dev
 | POST | `/api/ai/image/scene` | 生成场景图 |
 | GET | `/api/ai/image/versions` | 图片版本历史 |
 | GET | `/api/ai/image/restore` | 恢复项目所有图片 |
+| POST | `/api/ai/search` | AI 知识库搜索 |
+
+### 对话接口（需 Bearer Token）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/chat/{projectId}` | 发送消息 |
+| GET | `/api/chat/{projectId}/history` | 对话历史 |
 
 ### 剧本接口
 
@@ -255,6 +277,17 @@ npm run dev
 | GET | `/api/scripts/project/{id}/versions` | 版本列表 |
 | GET | `/api/scripts/project/{id}/latest` | 最新版本 |
 | GET | `/api/scripts/{versionId}/yaml` | 下载 YAML |
+| POST | `/api/scripts/project/{projectId}/save` | 保存编辑 |
+
+### 文件与文件夹（需 Bearer Token）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/files/upload` | 上传小说文件（TXT/EPUB/DOCX） |
+| GET | `/api/folders` | 文件夹列表 |
+| POST | `/api/folders` | 创建文件夹 |
+| PUT | `/api/folders/{id}` | 重命名文件夹 |
+| DELETE | `/api/folders/{id}` | 删除文件夹 |
 
 ### 系统接口
 
@@ -296,6 +329,9 @@ npm run dev
 | original_text | CLOB | 原文 |
 | chapter_count | INT | 章节数 |
 | status | VARCHAR(20) | DRAFT/PROCESSING/COMPLETED |
+| invite_token | VARCHAR(36) | 邀请链接 UUID |
+| created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
 
 ### script_versions
 | 字段 | 类型 | 说明 |
@@ -313,6 +349,18 @@ npm run dev
 | project_id | BIGINT FK | 项目 |
 | user_id | BIGINT FK | 用户 |
 | permission | VARCHAR(20) | ADMIN/READ |
+| last_seen_at | TIMESTAMP | 最近在线 |
+| created_at | TIMESTAMP | 创建时间 |
+
+### folders
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| user_id | BIGINT FK | 所有者 |
+| name | VARCHAR(100) | 文件夹名 |
+| color | VARCHAR(20) | 颜色标识 |
+| created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
 
 ### generation_plan（生成计划 — 任务制断点续传）
 | 字段 | 类型 | 说明 |
@@ -322,9 +370,38 @@ npm run dev
 | total_chapters | INT | 总章数 |
 | completed_chapters | INT | 已完成章数 |
 | version_number | INT | 对应版本号 |
-| chapters_json | CLOB | 章节任务列表 JSON（含 PENDING/IN_PROGRESS/DONE 状态） |
+| chapters_json | CLOB | 章节任务列表 JSON（PENDING/IN_PROGRESS/DONE） |
 | partial_yaml | CLOB | 累积的部分 YAML |
 | characters_json | CLOB | 累积的角色 JSON |
+| scenes_json | CLOB | 累积的场景 JSON |
+
+### generation_progress（流式生成进度 — 块级断点）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| project_id | BIGINT FK | 项目 |
+| total_chunks | INT | 总块数 |
+| chunk_map | CLOB | 块完成位图 |
+| partial_yaml | CLOB | 当前累计 YAML |
+| version_number | INT | 版本号 |
+| updated_at | TIMESTAMP | 更新时间 |
+
+### conversations
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| project_id | BIGINT FK | 项目 |
+| user_id | BIGINT FK | 用户 |
+| created_at | TIMESTAMP | 创建时间 |
+
+### messages
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| conversation_id | BIGINT FK | 对话 |
+| role | VARCHAR(20) | user/assistant |
+| content | CLOB | 内容 |
+| created_at | TIMESTAMP | 创建时间 |
 | scenes_json | CLOB | 累积的场景 JSON |
 | updated_at | TIMESTAMP | 更新时间 |
 
@@ -483,7 +560,7 @@ ai-novel-to-script/
 | PR 数量 | 11 个（feat 4 / fix 3 / docs 4） |
 | 代码总行数 | 8,118 行（Java 5,475 + Vue/JS/CSS 2,643） |
 | 源文件 | 111 个（后端 62 + 前端 19 + 部署 4 + 测试 9 + 配置 17） |
-| 数据库表 | 10 张（users, projects, script_versions, folders, collaborations, generation_plan, image_versions, conversations, messages, refresh_tokens） |
+| 数据库表 | 10 张（users, projects, script_versions, folders, collaborations, generation_plan, generation_progress, image_versions, conversations, messages） |
 | API 端点 | 44 个（含 SSE 流式、邀请链接、在线检测、协作管理、生图管线） |
 | 测试覆盖 | 9 类 36 用例，JUnit 5 + Mockito，CI 集成 `mvn verify` |
 | AI 集成 | DeepSeek(文本) + 混元 hy-image-lite(图片) + COS(存储) |
