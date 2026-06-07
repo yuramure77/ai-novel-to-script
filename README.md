@@ -69,12 +69,21 @@
 - **金色视觉系统** — 所有操作按钮统一为金色，章节 Pills 渐变金色 + hover 发光
 - **响应式适配** — 手机端完整适配，弹窗宽度自适、表单移动端布局优化
 
-### 🔧 DevOps
+### 🔧 DevOps & 安全
+
+**CI/CD**
 - **GitHub Actions CI** — push 自动编译+测试（`mvn verify`，含 36 个测试用例）+ 前端构建（Vite）
 - **Webhook 热部署** — GitHub push → webhook → git pull → build → restart，全程自动化
 - **systemd 服务** — 崩溃自动重启，journalctl 日志
 - **Nginx + HTTPS** — Let's Encrypt 自动证书
 - **健康检查** — Spring Boot Actuator `/actuator/health`
+
+**安全防护**
+- **认证鉴权** — JWT 无状态认证 + BCrypt 密码加密，AI/导出/剧本端点强制鉴权
+- **令牌桶限流** — 6 级分层：auth 20/min · AI 生成 3/min · AI 对话 10/min · AI 生图 10/min · AI 搜索 20/min · 通用 100/min
+- **API 密钥保护** — 所有密钥通过环境变量注入，源码零硬编码
+- **数据库安全** — H2 控制台生产关闭，密码 BCrypt 加盐
+- **防信息泄露** — Actuator 仅暴露 `/health`，错误信息不暴露堆栈
 
 ---
 
