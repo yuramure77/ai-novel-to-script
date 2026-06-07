@@ -1,252 +1,221 @@
-# 剧本 YAML Schema 定义文档
+# 📄 YAML Schema — 剧本结构化格式
 
-## 概述
+> 本文定义剧本工坊生成的 YAML 剧本的完整数据结构，并解释每个设计决策的原因。
 
-本 Schema 定义了 AI 小说转剧本工具输出的结构化剧本 YAML 格式。该格式设计目标是：
+---
 
-1. **人类可读可编辑** — 作者拿到初稿后可以用任何文本编辑器修改
-2. **机器可解析** — 方便下游工具链（导演、制片、分镜软件）消费
-3. **涵盖剧本核心要素** — 角色、场景、对白、动作、情绪、转场
-
-## 完整 Schema
+## 一、Schema 总览
 
 ```yaml
-# ==================== 顶层结构 ====================
-script:           # 剧本元信息
-  title: ""       # 剧本标题
-  based_on: ""    # 原著小说名称
-  author: ""      # 改编作者
-  version: "1.0"  # 剧本版本号
-  language: zh-CN # 语言代码
-  created_at: ""  # 创建日期 (ISO 8601)
+script:          # 剧本元数据
+  title:         # 剧本名称
+  based_on:      # 原著名称
+  author:        # 改编者
+  version:       # 版本号
+  language:       # 语言代码
+  created_at:    # 创建日期
 
-# ==================== 角色注册表 ====================
-characters:       # 所有出场角色，按首次出现顺序排列
-  - id: CHAR_001                 # 唯一标识符
-    name: "角色名"                # 角色名称（原文中的名字）
-    role: protagonist            # 角色类型
-    description: "外貌与性格描述"  # 角色概要
-    traits: ["特长", "性格"]      # 角色特征标签
-    first_appearance: SCENE_001  # 首次出场场景
+characters:      # 角色列表
+  - name:        # 角色名
+    role:        # 角色类型 (protagonist/antagonist/supporting/minor)
+    description: # 外貌/身份描述
+    traits:      # 性格特征
 
-# ==================== 场景序列 ====================
-scenes:           # 剧本主体，按时间顺序排列
-  - id: SCENE_001                 # 场景唯一标识
-    chapter: 1                    # 对应原著章节号
-    scene_number: 1               # 该章内的场景序号
-    type: INT                     # 场景类型
-    location: "场景地点"          # 具体地点描述
-    time: "时间描述"              # 时间环境描述
-    description: "场景氛围与环境"  # 场景整体描述（舞台指导）
-    characters: [CHAR_001]       # 本场景出场角色 ID 列表
-    beats:                        # 场景内原子节奏单元
-      - type: action              # 节奏类型
-        character: null           # 发言人（action/narration/transition 时为 null）
-        line: null                # 对白内容（action/narration/transition 时为 null）
-        direction: "动作/表演指导" # 舞台说明
-        emotion: null             # 角色情绪（action 时可为 null）
-
-      - type: dialogue            # 对白类型
-        character: CHAR_001       # 发言人 ID
-        line: "对白台词"           # 实际对白内容
-        direction: "说话时的动作或表情指导"  # 可选，表演指导
-        emotion: "愤怒"            # 说话时的情绪状态
-
-      - type: monologue           # 独白/内心
-        character: CHAR_001       # 独白的角色
-        line: "内心独白内容"
-        direction: "画外音 或 面对观众"
-        emotion: "悲伤"
-
-      - type: narration           # 旁白
-        character: null           # 旁白通常无具体角色
-        line: "旁白内容"
-        direction: "背景音画外音"
-        emotion: null
-
-      - type: transition          # 转场
-        character: null
-        line: null
-        direction: "淡入淡出 / 硬切 / 叠化"
-        emotion: null
+scenes:          # 场景列表
+  - chapter:     # 所属章节
+    scene_number: # 全局场景编号
+    type:        # 室内/室外 (INT/EXT/INT-EXT)
+    location:    # 地点
+    time:        # 时辰
+    description: # 场景描述
+    mood:        # 氛围
+    characters:  # 出场角色名列表
+      - 角色名
+    beats:       # 拍摄单元
+      - type:    # 动作/对白/独白/旁白/转场
+        character: # 说话者或执行者
+        line:    # 台词
+        direction: # 表演指导
+        emotion: # 情绪
 ```
 
-## 字段详细说明
+---
 
-### script（剧本元信息）
+## 二、字段详解
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `title` | string | 是 | 剧本标题 |
-| `based_on` | string | 否 | 原著小说名称，用于版权溯源 |
-| `author` | string | 否 | 改编剧本的作者名 |
-| `version` | string | 是 | 语义化版本号，支持多次修订追踪 |
-| `language` | string | 是 | BCP 47 语言标签，默认 zh-CN |
-| `created_at` | string | 是 | ISO 8601 日期格式 |
-
-### characters（角色注册表）
+### 2.1 `script` — 剧本元数据
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `id` | string | 是 | 全局唯一角色标识，格式 `CHAR_XXX`，全剧本引用 |
-| `name` | string | 是 | 角色在原文中的名称 |
-| `role` | enum | 是 | `protagonist`(主角) / `antagonist`(反派) / `supporting`(配角) / `minor`(次要) |
-| `description` | string | 否 | 角色外貌、性格、背景的综合描述 |
-| `traits` | string[] | 否 | 便于检索的关键特征标签，如 ["聪明", "武力高强"] |
-| `first_appearance` | string | 否 | 首次出场场景 ID，便于快速定位角色引入位置 |
+| `title` | string | ✅ | 剧本名称 |
+| `based_on` | string | | 原著小说名称 |
+| `author` | string | | 改编者 |
+| `version` | string | | 语义化版本，默认 `"1.0"` |
+| `language` | string | | IETF 语言标签，默认 `"zh-CN"` |
+| `created_at` | string | | ISO 8601 日期 |
 
-### scenes（场景序列）
+**设计原因**：元数据独立于内容，便于批量检索和版本管理。`based_on` 保留原著追溯链，对版权合规有用。
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | string | 是 | 全局唯一场景标识，格式 `SCENE_XXX` |
-| `chapter` | integer | 是 | 对应原著章节编号，保持可溯源 |
-| `scene_number` | integer | 是 | 该章内的场景序号 |
-| `type` | enum | 是 | 拍摄类型：`INT`(室内)、`EXT`(室外)、`INT/EXT`(内外交替) |
-| `location` | string | 是 | 具体地点描述，如"长安城外破庙" |
-| `time` | string | 是 | 时间环境，如"深夜月明"、"午后" |
-| `description` | string | 否 | 场景整体氛围、环境细节的舞台说明 |
-| `characters` | string[] | 是 | 本场景出场角色 ID 列表，引用 characters 中的 id |
-| `beats` | array | 是 | 场景内按时间顺序排列的原子节奏单元 |
-
-### beats（节奏单元）
-
-Beat 是剧本的最小结构单元。每个 beat 描述一个不可再分的戏剧节奏：一句对白、一个动作、一次转场。导演和演员可以按 beat 粒度进行排练和调整。
+### 2.2 `characters` — 角色
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `type` | enum | 是 | `action`(动作/场景描写) / `dialogue`(对白) / `monologue`(独白/内心) / `narration`(旁白) / `transition`(转场) |
-| `character` | string \| null | 条件 | `dialogue` 和 `monologue` 类型时必须填写角色 ID，其他类型为 null |
-| `line` | string \| null | 条件 | `dialogue`/`monologue`/`narration` 时填写实际内容，其他为 null |
-| `direction` | string | 是 | 表演指导或动作说明，导演和演员使用 |
-| `emotion` | string \| null | 否 | 角色当前的情绪状态，如"狂喜"、"绝望" |
+| `name` | string | ✅ | 使用原文中的角色名 |
+| `role` | enum | ✅ | `protagonist` / `antagonist` / `supporting` / `minor` |
+| `description` | string | | 外貌、身份、背景（AI 生图的输入源） |
+| `traits` | string[] | | 性格标签（AI 写台词的输入源） |
 
-## 设计原则与理由
+**设计原因**：
 
-### 1. 为什么使用 YAML 而非 JSON 或纯文本格式？
+- **顶层独立**：角色跨场景复用。放在 scnen 里会重复定义数十次。
+- **四档角色类型**：影视工业标准，覆盖 95% 的角色定位。
+- **描述与特征分离**：`description` 是外貌（→ AI 生图），`traits` 是性格（→ AI 写台词），分开避免干扰。
+- **使用原文名称**：保持与小说的直接关联，AI 不自作主张改名。
 
-- **比 JSON 更可读**：YAML 不用引号和花括号，作者用文本编辑器就能直接修改
-- **比纯文本更结构化**：YAML 保留了层级结构，方便程序解析和处理
-- **行业接地**：戏剧行业常用 YAML 作为交换格式，比 JSON 更易被非技术人员接受
+### 2.3 `scenes` — 场景
 
-### 2. 为什么将 characters 设计为独立的注册表而非内嵌在场景中？
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `chapter` | int | ✅ | 所属章节，从 1 开始 |
+| `scene_number` | int | ✅ | 全局递增场景编号 |
+| `type` | enum | | `INT`(室内) / `EXT`(室外) / `INT/EXT`(内外交替) |
+| `location` | string | | 地点描述 |
+| `time` | string | | 时辰描述（"黄昏""午夜"） |
+| `description` | string | | 场景内容概要 |
+| `mood` | string | | 情绪基调（"紧张""温馨"） |
+| `characters` | string[] | | 出场角色名（引用 characters 的 name） |
+| `beats` | Beat[] | | 拍摄单元 |
 
-- **避免重复**：一个角色可能出现在多个场景中，注册表模式确保角色信息定义一次、引用多次
-- **便于修改**：修改角色描述只需改一处，所有场景自动更新
-- **可独立管理**：导演可以先通读角色表了解人物，再深入具体场景
-- **支持工具链**：角色表可以单独导出为演员分配表、角色关系图等
+**设计原因**：
 
-### 3. 为什么引入 beat 作为最小结构单元？
+- **扁平列表而非嵌套在 chapter 下**：章节是编辑时的组织方式，场景需要全局编号。增量生成时新场景直接追加，无需修改父节点。
+- **独立 scene_number**：不与章节耦合。后续调整章节划分，场景编号不受影响。Final Draft 等行业软件也使用全局编号。
+- **type 使用 INT/EXT**：影视标准缩写，美术灯光部门的前期依据。
+- **characters 是名字引用而非内嵌**：指向顶层角色名。修改角色只需改一处。
+- **location/time 分离**：场景图生成需要独立的时空参数。
+- **mood 独立存储**：情绪是生图 prompt 和表演指导的输入，不应混在 description 里。
 
-- **原子性**：每个 beat 是一个不可再分的戏剧动作，编剧和导演可以在 beat 级别做精确调整
-- **类型枚举覆盖全**：对白 (dialogue)、独白 (monologue)、旁白 (narration)、动作 (action)、转场 (transition) 五种类型覆盖了剧本需要的所有表达形式
-- **表演指导内置**：每个 beat 都有独立的 `direction` 和 `emotion` 字段，演员定位更准确
+### 2.4 `beats` — 拍摄单元
 
-### 4. 为什么区分 dialogue、monologue 和 narration？
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `type` | enum | `action` / `dialogue` / `monologue` / `narration` / `transition` |
+| `character` | string | 说话者或动作执行者（可选） |
+| `line` | string | 台词内容 |
+| `direction` | string | 表演指导（中文） |
+| `emotion` | string | 情绪状态 |
 
-三种"说话"方式在剧本中有不同的呈现形式：
-- **dialogue（对白）**：角色之间互相说话，镜头通常对准说话人和倾听者
-- **monologue（独白）**：角色对自己说话或打破第四面墙面对观众，表演方式不同
-- **narration（旁白）**：画外音，角色不在画面内，通常录制后叠加
+**五分类法的设计依据**：
 
-这种区分让分镜师和导演可以精确理解每种语言的呈现方式。
+| 类型 | 对应 | 示例 |
+|------|------|------|
+| `action` | 动作/场景描写 | "窗外一道闪电划破夜空" |
+| `dialogue` | 对白 | "你终于来了" |
+| `monologue` | 独白/内心 | 角色自言自语 |
+| `narration` | 旁白 | 画外音 |
+| `transition` | 转场 | 淡入淡出 |
 
-### 5. 为什么要保持与原著章节的对应关系（chapter 字段）？
+比"对白/动作"二分法精确，又不至于过度细分。覆盖剧本里 95% 的叙事单元。
 
-- **可溯源**：导演可以随时回到原著对应章节，核对待改编内容
-- **差异分析**：可以逐章对比原著和剧本，评估改编忠实度
-- **进度管理**：按章节管理改编进度，支持分章节审核和修改
+**direction 使用中文**：中文剧本习惯用"冷笑一声""眼眶微红"等表达，英文 `stage direction` 格式不适合中文创作。
 
-### 6. 为什么场景类型只有 INT/EXT/INT-EXT 三种？
+---
 
-这是电影工业的标准分类，足够覆盖所有场景需求：
-- **INT (Interior)**：室内场景
-- **EXT (Exterior)**：室外场景
-- **INT/EXT**：室内外交替场景
+## 三、设计理念
 
-保持简单有助于下游工具（如预算软件自动估算场景成本）准确解析。
+### 3.1 为什么选择 YAML
 
-### 7. 为什么 role 枚举使用英文值？
+| 对比 | YAML | JSON | XML | Fountain |
+|------|------|------|-----|----------|
+| 人类可读 | 最优 | 括号密集 | 标签冗余 | 结构松散 |
+| 层级表达 | 缩进天然 | ✅ | ✅ | ❌ |
+| 版本控制 diff | 清晰 | 需格式化 | ⚠️ | ⚠️ |
+| 行内注释 | ✅ `#` | 无标准 | ✅ | ✅ |
+| 多行文本 | ✅ | 转义 | ✅ | ✅ |
+| Java 工具链 | SnakeYAML | Jackson | JAXB | 专用解析器 |
 
-- **与国际化工具链兼容**：protagonist/antagonist 等术语是影视工业的通用术语
-- **避免编码歧义**：中文"反派"在某些语境下可能被翻译为 villain/antagonist/opponent，使用英文枚举值更精确
-- **AI 生成友好**：主流 LLM 对英文 role 值的理解更一致
+核心原因：**剧本是给人读的**。编剧打开 YAML 不需要工具就能理解。缩进层级天然映射"角色→场景→对白"结构。
 
-## 版本演进计划
+YAML 是中间表示（IR），可以导出为 Fountain、Markdown 等任意格式，保留最大灵活性。
 
-| 版本 | 计划新增 |
-|------|---------|
-| v1.0 | 当前版本，基础剧本结构 |
-| v1.1 | 支持 camera（景别/运镜）提示 |
-| v1.2 | 支持 soundtrack（配乐/音效）标记 |
-| v2.0 | 支持多线叙事、闪回/闪前等非线性结构 |
+### 3.2 增量友好的扁平结构
 
-## 示例片段
+断点续传要求生成第 N 章时，新场景直接 append 到列表末尾，mergeCharacters 去重。如果 scenes 嵌套在 chapters 下，每次更新需要修改父节点，并发和合并逻辑复杂得多。
+
+### 3.3 扩展预留
+
+通过 `version` 字段区分版本。未来可扩展：
+
+- `scenes[].shots` — 分镜头
+- `characters[].relations` — 角色关系图
+- `beats[].camera` — 摄影指导
+- `script.genre` — 类型标签
+
+---
+
+## 四、完整示例
 
 ```yaml
 script:
-  title: "江湖旧事"
-  based_on: "侠客行"
-  author: "张三"
+  title: 春雪 改编剧本
+  based_on: 三岛由纪夫《春雪》
+  author: yuramure
   version: "1.0"
   language: zh-CN
-  created_at: "2026-06-05"
+  created_at: "2026-06-07"
 
 characters:
-  - id: CHAR_001
-    name: "李云"
+  - name: 松枝清显
     role: protagonist
-    description: "三十来岁，江湖游侠，身怀绝技却内敛沉稳"
-    traits: ["剑术高超", "侠义心肠", "少言寡语"]
-    first_appearance: SCENE_001
-
-  - id: CHAR_002
-    name: "赵铁山"
-    role: antagonist
-    description: "黑风寨寨主，身材魁梧，满脸横肉"
-    traits: ["力大无穷", "心狠手辣"]
-    first_appearance: SCENE_003
+    description: 松枝侯爵家继承人，十八岁，容貌俊美而忧郁
+    traits:
+      - 感性
+      - 忧郁
+      - 纤细敏感
+  - name: 本多繁邦
+    role: supporting
+    description: 清显的好友，法官之子，理性稳重
+    traits:
+      - 理性
+      - 稳重
+      - 善于观察
 
 scenes:
-  - id: SCENE_001
-    chapter: 1
+  - chapter: 1
     scene_number: 1
-    type: EXT
-    location: "长安城外古道"
-    time: "黄昏，残阳如血"
-    description: "秋风萧瑟，黄沙漫卷，一条古道蜿蜒通向远方"
-    characters: [CHAR_001]
+    type: INT
+    location: 松枝家宅邸，清显的房间
+    time: 冬日午后
+    description: 清显独自看雪，本多前来探望
+    mood: 静谧而忧郁
+    characters:
+      - 松枝清显
+      - 本多繁邦
     beats:
       - type: action
-        character: null
-        line: null
-        direction: "镜头从天空摇下，缓缓推向古道上一个孤独的身影"
-        emotion: null
-
-      - type: action
-        character: null
-        line: null
-        direction: "李云骑着马缓缓前行，斗笠遮住半张脸，风衣随风飘扬"
-        emotion: null
-
-      - type: monologue
-        character: CHAR_001
-        line: "十年了...该来的终究要来。"
-        direction: "面对观众，目光深沉"
-        emotion: "沧桑而坚定"
-
-      - type: transition
-        character: null
-        line: null
-        direction: "叠化至下一场景"
-        emotion: null
+        character: 松枝清显
+        direction: 站在窗前，一手轻触玻璃，凝视飘雪
+        emotion: 若有所思
+      - type: dialogue
+        character: 本多繁邦
+        line: 又在看雪。你已经看了一个时辰了。
+        emotion: 无奈
+      - type: dialogue
+        character: 松枝清显
+        line: 雪是活的。每一片都有不同的轨迹。
+        emotion: 平静
 ```
 
-## 下游消费示例
+---
 
-此 Schema 可被以下工具直接消费：
+## 五、与导出格式的映射
 
-- **分镜软件**（如 Storyboarder）：按场景和 beat 自动生成分镜草稿
-- **预算估算工具**：解析场景类型（INT/EXT）和角色数量，估算拍摄成本
-- **演员调度系统**：按角色出场场景编排拍摄日程
-- **字幕工具**：直接提取所有 dialogue 和 monologue 的 line 字段
+| YAML 字段 | Markdown | Fountain | TXT |
+|-----------|----------|----------|-----|
+| `script.title` | `# 标题` | Title Page | 标题行 |
+| `characters` | 角色表格 | Character List | 分行列出 |
+| `scenes[].chapter` | `## 第X章` | `# Chapter X` | `=== 第X章 ===` |
+| `scenes[].type/location/time` | 场景头 | `INT. LOCATION - TIME` | 缩进标注 |
+| `beats[].type=action` | 段落 | Action 块 | 正文 |
+| `beats[].type=dialogue` | `> 台词` | `角色名\n台词` | `角色：台词` |
+| `beats[].direction` | 括号注释 | `(指导)` | `【指导】` |
