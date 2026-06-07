@@ -35,14 +35,17 @@ public class SecurityConfig {
             .securityContext(securityContext -> securityContext
                 .securityContextRepository(new RequestAttributeSecurityContextRepository()))
             .authorizeHttpRequests(auth -> auth
+                // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/deploy/**").permitAll()
-                .requestMatchers("/api/export/**").permitAll()
-                .requestMatchers("/api/scripts/*/yaml").permitAll()
-                .requestMatchers("/api/ai/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                // Authenticated: AI (costly), export, scripts
+                .requestMatchers("/api/ai/**").authenticated()
+                .requestMatchers("/api/export/**").authenticated()
+                .requestMatchers("/api/scripts/**").authenticated()
+                // All other API require auth
                 .requestMatchers("/api/**").authenticated()
+                // Static resources and SPA
                 .anyRequest().permitAll()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))

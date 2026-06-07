@@ -39,6 +39,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 rateLimitConfig.aiChatLimiter(), "AI 对话请求太频繁，请稍后再试"))
                 .addPathPatterns("/api/chat/**");
 
+        // AI image — 10/min (expensive: API call + COS upload)
+        registry.addInterceptor(new RateLimitInterceptor(
+                rateLimitConfig.aiImageLimiter(), "AI 生图请求太频繁，请稍后再试"))
+                .addPathPatterns("/api/ai/image/**");
+
+        // AI search — 20/min
+        registry.addInterceptor(new RateLimitInterceptor(
+                rateLimitConfig.aiSearchLimiter(), "AI 搜索请求太频繁，请稍后再试"))
+                .addPathPatterns("/api/ai/search");
+
         // File upload — 20/min
         registry.addInterceptor(new RateLimitInterceptor(
                 rateLimitConfig.uploadLimiter(), "文件上传太频繁，请稍后再试"))
@@ -51,6 +61,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/api/auth/**",
                         "/api/projects/*/generate/**",
                         "/api/chat/**",
+                        "/api/ai/image/**",
+                        "/api/ai/search",
                         "/api/files/upload",
                         "/api/deploy/webhook"); // Never rate-limit webhook
     }

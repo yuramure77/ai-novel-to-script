@@ -64,4 +64,22 @@ public class RateLimitConfig {
     public RateLimiter uploadLimiter() {
         return new RateLimiter(30, 20, Duration.ofMinutes(1));
     }
+
+    /**
+     * AI 生图限流：10次/分钟，突发上限15
+     * 适用于：角色图/场景图生成（API调用+存储上传）
+     */
+    @Bean
+    public RateLimiter aiImageLimiter() {
+        return new RateLimiter(15, 10, Duration.ofMinutes(1));
+    }
+
+    /**
+     * AI 搜索限流：20次/分钟，突发上限30
+     * 适用于：知识库搜索
+     */
+    @Bean
+    public RateLimiter aiSearchLimiter() {
+        return new RateLimiter(30, 20, Duration.ofMinutes(1));
+    }
 }
