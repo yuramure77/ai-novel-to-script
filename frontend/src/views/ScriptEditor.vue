@@ -478,15 +478,30 @@ watch(yaml,()=>{
     const out=[]; const txt=yaml.value
     // Split scenes: AI format "- title:" / "- scene_id:" / demo format "  - id: SCENE_"
     const re=/(?:^|\n)\s*- (?:id: |title: |scene_id: )/
-    let lastIdx=0; const matches=[...txt.matchAll(new RegExp(re,'g'))]
+    const matches=[...txt.matchAll(new RegExp(re,'g'))]
     for(let i=0;i<matches.length;i++){
       const start=matches[i].index+(matches[i][0].startsWith('\n')?1:0)
       const end=i+1<matches.length?matches[i+1].index:txt.length
       const s=txt.substring(start,end)
       const loc=s.match(/location:\s*"?([^"\n]+)/)
-      const time=s.match(/time:\s*"?([^"\n]+)/)
+      const tim=s.match(/time:\s*"?([^"\n]+)/)
+      const mood=s.match(/mood:\s*"?([^"\n]+)/)
       const desc=s.match(/(?:description|title):\s*"?([^"\n]+)/)
-      out.push({title:(desc?desc[1]:loc?loc[1]:'')+' · '+(time?time[1]:''),description:desc?desc[1]:loc?loc[1]:'',location:loc?loc[1]:'',time:time?time[1]:''})
+      const action=s.match(/action:\s*"?([^"\n]+)/)
+      // Build rich description from all available fields for better image prompts
+      const parts=[]
+      if(desc) parts.push(desc[1])
+      if(action) parts.push(action[1])
+      const title = (desc?desc[1]:loc?loc[1]:'场景'+(i+1)) + (tim?' · '+tim[1]:'')
+      const fullDesc = parts.join('。')
+      out.push({
+        title,
+        description: fullDesc || desc?.[1] || loc?.[1] || '',
+        location: loc?.[1] || '',
+        time: tim?.[1] || '',
+        mood: mood?.[1] || '',
+        action: action?.[1] || ''
+      })
     }
     sceneImgs.value = out
   }catch{}
@@ -546,6 +561,8 @@ function doGen(){
               gen.value=false;ElMessage.success('生成完成')
               if(d.totalChapters) totalChapters.value = d.totalChapters
               fetchGenResult()
+              // Auto-generate scene images incrementally
+              nextTick(() => { setTimeout(autoGenScenes, 500) })
             }
             else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
           }catch(e){console.warn('SSE parse:',e,dl?.substring(0,80))}
@@ -679,10 +696,30 @@ async function genScnImg(s,i){
     ElMessage.info('正在生成场景图...')
     const r=await api.post('/ai/image/scene',{
       projectId: Number(pid), sceneIndex: i,
-      description: s.description, location: s.location, time: s.time, mood: ''
+      description: s.description || s.action || '',
+      location: s.location, time: s.time, mood: s.mood || ''
     })
     sceneImgs.value[i] = {...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt}
   }catch{ElMessage.error('生成失败')}
+}
+
+// Auto-generate scene images after script generation (incremental, non-blocking)
+async function autoGenScenes() {
+  let count = 0
+  for (let i = 0; i < sceneImgs.value.length; i++) {
+    if (!sceneImgs.value[i].image) {
+      try {
+        const s = sceneImgs.value[i]
+        const r = await api.post('/ai/image/scene', {
+          projectId: Number(pid), sceneIndex: i,
+          description: s.description || s.action || '', location: s.location, time: s.time, mood: s.mood || ''
+        })
+        sceneImgs.value[i] = { ...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt }
+        count++
+      } catch { /* skip */ }
+    }
+  }
+  if (count > 0) ElMessage.success(`已自动生成 ${count} 张场景图`)
 }
 
 // Batch generate all scene images
@@ -696,7 +733,7 @@ async function genAllScenes() {
         const s = sceneImgs.value[i]
         const r = await api.post('/ai/image/scene', {
           projectId: Number(pid), sceneIndex: i,
-          description: s.description, location: s.location, time: s.time, mood: ''
+          description: s.description || s.action || '', location: s.location, time: s.time, mood: s.mood || ''
         })
         sceneImgs.value[i] = { ...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt }
         done++
