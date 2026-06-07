@@ -479,10 +479,12 @@ ai-novel-to-script/
 
 | 指标 | 数据 |
 |------|------|
-| 提交总数 | 158 commits |
-| 代码行数 | 5,322 行 Java + 2,407 行 Vue/JS/CSS |
-| 数据库表 | 8 张（users, projects, script_versions, folders, collaborations, generation_plan, image_versions, conversations） |
-| API 端点 | 35+（含 SSE 流式、邀请链接、在线检测） |
-| AI 集成 | DeepSeek(文本) + 混元hy-image-lite(图片) + COS(存储) |
-| 提交分布 | 修复47 + 新增21 + 优化24 + 重构6 + 文档3 + 诊断2 |
-| 测试覆盖 | 9 类 36 用例，JUnit 5 + Mockito |
+| 提交总数 | 196 commits |
+| PR 数量 | 11 个（feat 4 / fix 3 / docs 4） |
+| 代码总行数 | 8,118 行（Java 5,475 + Vue/JS/CSS 2,643） |
+| 源文件 | 111 个（后端 62 + 前端 19 + 部署 4 + 测试 9 + 配置 17） |
+| 数据库表 | 10 张（users, projects, script_versions, folders, collaborations, generation_plan, image_versions, conversations, messages, refresh_tokens） |
+| API 端点 | 44 个（含 SSE 流式、邀请链接、在线检测、协作管理、生图管线） |
+| 测试覆盖 | 9 类 36 用例，JUnit 5 + Mockito，CI 集成 `mvn verify` |
+| AI 集成 | DeepSeek(文本) + 混元 hy-image-lite(图片) + COS(存储) |
+| 提交分布 | 修复 74 + 新增 30 + 优化 28 + 文档 17 + 测试 6 + 重构 5 + 其他 36 |
