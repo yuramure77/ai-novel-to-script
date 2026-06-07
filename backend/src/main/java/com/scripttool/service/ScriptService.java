@@ -112,7 +112,7 @@ public class ScriptService {
                 // Resume: if continuing from interrupted generation, skip processed chapters
                 int resumeFrom = 0;
                 if (resume) {
-                    var latestVersion = projectService.getLatestVersion(projectId);
+                    var latestVersion = projectService.getLatestScriptVersion(projectId);
                     if (latestVersion != null && latestVersion.getYamlContent() != null) {
                         // Count chapters already in the partial YAML
                         int maxChap = 0;
@@ -134,12 +134,6 @@ public class ScriptService {
                     send(emitter, "progress", Map.of("step", "split", "message",
                         "跳过前 " + skip + " 章，处理剩余 " + toProcess.size() + " 章",
                         "totalChapters", toProcess.size(), "fullTotal", total));
-                } else {
-                    projectService.updateChapterCount(projectId, total);
-                    String pageInfo = limit > 0 ? String.format("识别到 %d 章，处理第 %d-%d 章", total, from + 1, to) :
-                            "识别到 " + total + " 个章节";
-                    send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
-                            "totalChapters", toProcess.size(), "fullTotal", total));
                 }
 
                 // Count total chunks

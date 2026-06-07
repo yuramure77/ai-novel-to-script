@@ -1,28 +1,55 @@
 package com.scripttool.service;
 
+import com.scripttool.model.entity.Collaboration;
 import com.scripttool.model.entity.Project;
 import com.scripttool.model.entity.ScriptVersion;
+import com.scripttool.repository.CollaborationRepository;
 import com.scripttool.repository.ProjectRepository;
 import com.scripttool.repository.ScriptVersionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.*;
 
 @Service
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ScriptVersionRepository scriptVersionRepository;
+    private final CollaborationRepository collabRepository;
 
     public ProjectService(ProjectRepository projectRepository,
-                          ScriptVersionRepository scriptVersionRepository) {
+                          ScriptVersionRepository scriptVersionRepository,
+                          CollaborationRepository collabRepository) {
         this.projectRepository = projectRepository;
         this.scriptVersionRepository = scriptVersionRepository;
+        this.collabRepository = collabRepository;
     }
 
     public List<Project> listUserProjects(Long userId) {
-        return projectRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        List<Project> own = projectRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+
+        // Also include projects shared with this user
+        List<Collaboration> shared = collabRepository.findByUserId(userId);
+        Set<Long> ownIds = new HashSet<>();
+        for (Project p : own) ownIds.add(p.getId());
+
+        List<Project> all = new ArrayList<>(own);
+        for (Collaboration c : shared) {
+            if (!ownIds.contains(c.getProjectId())) {
+                projectRepository.findById(c.getProjectId()).ifPresent(all::add);
+            }
+        }
+        return all;
+    }
+
+    /** Get the user's permission for a project (null if no access) */
+    public String getPermission(Long projectId, Long userId) {
+        Project project = getProject(projectId);
+        if (project.getUserId().equals(userId)) return "ADMIN";
+        return collabRepository.findByProjectIdAndUserId(projectId, userId)
+                .map(c -> c.getPermission().name())
+                .orElse(null);
     }
 
     public Project getProject(Long id) {

@@ -6,6 +6,7 @@ import com.scripttool.model.dto.ProjectResponse;
 import com.scripttool.model.entity.Project;
 import com.scripttool.model.entity.ScriptVersion;
 import com.scripttool.service.ChapterSplitService;
+import com.scripttool.service.CollaborationService;
 import com.scripttool.service.ProjectService;
 import com.scripttool.service.ScriptService;
 import jakarta.validation.Valid;
@@ -25,31 +26,47 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ScriptService scriptService;
+    private final CollaborationService collabService;
 
-    public ProjectController(ProjectService projectService, ScriptService scriptService) {
+    public ProjectController(ProjectService projectService, ScriptService scriptService,
+                             CollaborationService collabService) {
         this.projectService = projectService;
         this.scriptService = scriptService;
+        this.collabService = collabService;
     }
 
     private Long getUserId(Authentication auth) {
         return (Long) auth.getPrincipal();
     }
 
+    /** Check user has at least read access; returns 403 if not */
+    private boolean checkAccess(Project project, Long userId) {
+        return collabService.canView(project.getId(), userId);
+    }
+
+    /** Check user has admin/owner access */
+    private boolean checkAdmin(Project project, Long userId) {
+        return collabService.canEdit(project.getId(), userId);
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<List<ProjectResponse>>> list(
             @RequestParam(required = false) Long folderId, Authentication auth) {
-        List<Project> projects = projectService.listUserProjects(getUserId(auth));
+        Long userId = getUserId(auth);
+        List<Project> projects = projectService.listUserProjects(userId);
         if (folderId != null) {
             projects = projects.stream().filter(p -> folderId.equals(p.getFolderId())).toList();
         }
-        List<ProjectResponse> response = projects.stream().map(ProjectResponse::from).toList();
+        List<ProjectResponse> response = projects.stream()
+                .map(p -> ProjectResponse.from(p, userId, projectService.getPermission(p.getId(), userId)))
+                .toList();
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PutMapping("/{id}/move")
     public ResponseEntity<ApiResponse<?>> move(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication auth) {
         Project project = projectService.getProject(id);
-        if (!project.getUserId().equals(getUserId(auth)))
+        if (!checkAdmin(project, getUserId(auth)))
             return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
         Object fid = body.get("folderId");
         project.setFolderId(fid != null ? Long.valueOf(fid.toString()) : null);
@@ -59,14 +76,17 @@ public class ProjectController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<?>> get(@PathVariable Long id, Authentication auth) {
         try {
+            Long userId = getUserId(auth);
             Project project = projectService.getProject(id);
-            if (!project.getUserId().equals(getUserId(auth))) {
+            if (!checkAccess(project, userId)) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
             }
-            ProjectResponse pr = ProjectResponse.from(project);
+            String perm = projectService.getPermission(id, userId);
+            ProjectResponse pr = ProjectResponse.from(project, userId, perm);
             Map<String, Object> data = new HashMap<>();
             data.put("project", pr);
             data.put("originalText", project.getOriginalText());
+            data.put("permission", perm);
             return ResponseEntity.ok(ApiResponse.success(data));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
@@ -77,8 +97,9 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<?>> create(@Valid @RequestBody CreateProjectRequest request,
                                                   Authentication auth) {
         try {
-            Project project = projectService.createProject(getUserId(auth), request.getTitle(), request.getOriginalText());
-            return ResponseEntity.ok(ApiResponse.success(ProjectResponse.from(project)));
+            Long userId = getUserId(auth);
+            Project project = projectService.createProject(userId, request.getTitle(), request.getOriginalText());
+            return ResponseEntity.ok(ApiResponse.success(ProjectResponse.from(project, userId, "ADMIN")));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }
@@ -90,7 +111,7 @@ public class ProjectController {
                                                   Authentication auth) {
         try {
             Project project = projectService.getProject(id);
-            if (!project.getUserId().equals(getUserId(auth))) {
+            if (!checkAdmin(project, getUserId(auth))) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
             }
             String newTitle = body.get("title");
@@ -109,7 +130,7 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<?>> delete(@PathVariable Long id, Authentication auth) {
         try {
             Project project = projectService.getProject(id);
-            if (!project.getUserId().equals(getUserId(auth))) {
+            if (!checkAdmin(project, getUserId(auth))) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
             }
             projectService.deleteProject(id);
@@ -123,7 +144,7 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<?>> splitChapters(@PathVariable Long id, Authentication auth) {
         try {
             Project project = projectService.getProject(id);
-            if (!project.getUserId().equals(getUserId(auth))) {
+            if (!checkAdmin(project, getUserId(auth))) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
             }
             List<ChapterSplitService.ChapterResult> chapters = scriptService.previewChapters(id);
@@ -144,6 +165,10 @@ public class ProjectController {
     @PostMapping("/{id}/generate")
     public ResponseEntity<ApiResponse<?>> generate(@PathVariable Long id, Authentication auth) {
         try {
+            Project project = projectService.getProject(id);
+            if (!checkAdmin(project, getUserId(auth))) {
+                return ResponseEntity.status(403).body(ApiResponse.error(403, "无权操作"));
+            }
             ScriptVersion version = scriptService.generateScript(id, getUserId(auth));
             return ResponseEntity.ok(ApiResponse.success(Map.of(
                     "versionId", version.getId(),
@@ -160,6 +185,10 @@ public class ProjectController {
             @RequestParam(defaultValue = "0") int start,
             @RequestParam(defaultValue = "0") int limit,
             @RequestParam(defaultValue = "false") boolean resume) {
+        Project project = projectService.getProject(id);
+        if (!checkAdmin(project, getUserId(auth))) {
+            throw new RuntimeException("无权操作");
+        }
         return scriptService.generateScriptStream(id, getUserId(auth), start, limit, resume);
     }
 }
