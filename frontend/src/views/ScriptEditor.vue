@@ -834,7 +834,8 @@ async function doSrch(){
 async function loadV(){try{vers.value=(await listVersions(pid)).data.data||[]}catch{}}
 function ldVer(v){yaml.value=v.yamlContent;edit.value=false;showHist.value=false}
 function dl(id){window.open(getYamlUrl(id),'_blank')}
-function cpyY(){navigator.clipboard.writeText(yaml.value).then(()=>ElMessage.success('已复制')).catch(()=>{})}
+function cpyY(){const t=yaml.value;if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(()=>ElMessage.success('已复制')).catch(()=>fallbackCopyYaml(t))}else{fallbackCopyYaml(t)}}
+function fallbackCopyYaml(text){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ElMessage.success('已复制')}catch{ElMessage.error('复制失败')}finally{document.body.removeChild(ta)}}
 
 // Export
 function expCmd(cmd){
