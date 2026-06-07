@@ -1,5 +1,7 @@
 package com.scripttool.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +10,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class ChapterSplitService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChapterSplitService.class);
 
     // ── Pattern tier list: most specific → least specific ──
     // Prevent false positives by ordering patterns from strictest to loosest
@@ -113,17 +117,21 @@ public class ChapterSplitService {
         pts.sort((a, b) -> Integer.compare(a.pos, b.pos));
 
         List<ChapterResult> chapters = new ArrayList<>();
+        int chapterNum = 1;
         for (int i = 0; i < pts.size(); i++) {
             int start = pts.get(i).pos;
             int end = (i + 1 < pts.size()) ? pts.get(i + 1).pos : text.length();
             if (end <= start) continue;
             try {
                 String content = text.substring(start, Math.min(end, text.length())).trim();
-                if (content.length() >= 50) {
-                    chapters.add(new ChapterResult(i + 1, pts.get(i).title, content));
+                if (content.length() >= 20) {
+                    chapters.add(new ChapterResult(chapterNum++, pts.get(i).title, content));
+                } else {
+                    log.debug("跳过过短章节: {} ({}字)", pts.get(i).title, content.length());
                 }
             } catch (StringIndexOutOfBoundsException e) { continue; }
         }
+        log.info("分章结果: {}/{} 章节通过筛选", chapters.size(), pts.size());
         return chapters;
     }
 
@@ -204,17 +212,18 @@ public class ChapterSplitService {
         pairs.sort((a, b) -> a.pos - b.pos);
 
         List<ChapterResult> chapters = new ArrayList<>();
+        int chapterNum = 1;
         for (int i = 0; i < pairs.size(); i++) {
             int start = pairs.get(i).pos;
             int end = (i + 1 < pairs.size()) ? pairs.get(i + 1).pos : text.length();
             if (end <= start || start >= text.length()) continue;
             try {
                 String content = text.substring(start, Math.min(end, text.length())).trim();
-                if (content.length() >= 50) {
-                    chapters.add(new ChapterResult(i + 1, titles.get(pairs.get(i).origIdx), content));
+                if (content.length() >= 20) {
+                    chapters.add(new ChapterResult(chapterNum++, titles.get(pairs.get(i).origIdx), content));
                 }
             } catch (Exception e) {
-                System.err.println("Bad marker at " + start + ": " + e.getMessage());
+                log.warn("Bad marker at {}: {}", start, e.getMessage());
             }
         }
         return chapters;
@@ -245,7 +254,7 @@ public class ChapterSplitService {
                 }
             }
             String chapterText = content.toString().trim();
-            if (chapterText.length() >= 50) {
+            if (chapterText.length() >= 20) {
                 String label = "第" + chapterNum + "部分";
                 chapters.add(new ChapterResult(chapterNum++, label, chapterText));
             }
@@ -269,7 +278,7 @@ public class ChapterSplitService {
             if (end <= start) break;
             try {
                 String content = text.substring(start, Math.min(end, text.length())).trim();
-                if (content.length() >= 100) {
+                if (content.length() >= 20) {
                     String label = "第" + num + "部分";
                     chapters.add(new ChapterResult(num++, label, content));
                 }
