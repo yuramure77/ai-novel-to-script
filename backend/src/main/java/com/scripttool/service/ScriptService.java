@@ -326,6 +326,7 @@ public class ScriptService {
                                         ));
                                     } catch (Exception ex) {
                                         log.warn("Scene image gen failed idx={}: {}", sceneIdx, ex.getMessage());
+                                        log.debug("Scene image gen stack trace", ex);
                                     }
                                 });
                             }

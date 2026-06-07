@@ -4,6 +4,8 @@ import com.scripttool.model.dto.ApiResponse;
 import com.scripttool.model.entity.ImageVersion;
 import com.scripttool.service.ImageService;
 import com.scripttool.service.SearchService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +15,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
+
+    private static final Logger log = LoggerFactory.getLogger(AiController.class);
 
     private final SearchService searchService;
     private final ImageService imageService;
@@ -37,6 +41,8 @@ public class AiController {
         try {
             Long projectId = toLong(body.get("projectId"));
             int sceneIndex = toInt(body.get("sceneIndex"));
+            log.info("[生图API] 场景图请求 projectId={} idx={} desc={}",
+                projectId, sceneIndex, body.get("description"));
             Map<String, Object> result = imageService.generateSceneImage(
                     projectId, sceneIndex,
                     (String) body.get("description"),
@@ -44,8 +50,10 @@ public class AiController {
                     (String) body.get("time"),
                     (String) body.get("mood")
             );
+            log.info("[生图API] 场景图成功 idx={}", sceneIndex);
             return ResponseEntity.ok(ApiResponse.success(result));
         } catch (RuntimeException e) {
+            log.error("[生图API] 场景图失败: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }
     }
@@ -57,14 +65,18 @@ public class AiController {
             int charIndex = toInt(body.get("charIndex"));
             @SuppressWarnings("unchecked")
             var traits = (java.util.List<String>) body.getOrDefault("traits", java.util.List.of());
+            log.info("[生图API] 角色图请求 projectId={} idx={} name={}",
+                projectId, charIndex, body.get("name"));
             Map<String, Object> result = imageService.generateCharacterImage(
                     projectId, charIndex,
                     (String) body.get("name"),
                     (String) body.get("description"),
                     traits
             );
+            log.info("[生图API] 角色图成功 idx={}", charIndex);
             return ResponseEntity.ok(ApiResponse.success(result));
         } catch (RuntimeException e) {
+            log.error("[生图API] 角色图失败: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
         }
     }
