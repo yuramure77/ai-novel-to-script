@@ -590,7 +590,7 @@ async function doSplit(){splitting.value=true;try{const r=await splitChapters(pi
 
 // Generate SSE
 function doGen(){
-  gen.value=true;progressMsg.value='连接中...';resetAutoGenIdx();planChapters.value=[]
+  gen.value=true;progressMsg.value='连接中...';planChapters.value=[]
   // Keep existing yaml visible during reconnect — don't clear yaml.value
   fetch(`/api/projects/${pid}/generate/stream`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
     .then(r=>{const reader=r.body.getReader(),dec=new TextDecoder();let buf=''
@@ -649,19 +649,6 @@ function doGen(){
               } else {
                 progressMsg.value='生成中...'
               }
-              // Fallback: trigger scene image generation for newly available scenes
-              nextTick(() => { autoGenScenesForNew() })
-            }
-            else if(ev==='scene_image'){
-              // Real-time scene image push from backend thread pool
-              if(d.url && d.index !== undefined){
-                const idx = Number(d.index)
-                // Create entry if not yet parsed from YAML (handles race condition)
-                if(!sceneImgs.value[idx]){
-                  sceneImgs.value[idx] = { title: d.title || ('场景'+(idx+1)), description: '', location: '', time: '', mood: '' }
-                }
-                sceneImgs.value[idx] = { ...sceneImgs.value[idx], image: d.url, prompt: d.prompt || '' }
-              }
             }
             else if(ev==='done'){
               if(d.yamlContent){
@@ -672,8 +659,6 @@ function doGen(){
               gen.value=false;ElMessage.success('生成完成')
               if(d.totalChapters) totalChapters.value = d.totalChapters
               fetchGenResult()
-              // Full sweep for any remaining scene images
-              nextTick(() => { setTimeout(autoGenScenes, 800) })
             }
             else if(ev==='error'){const msg=typeof d==='string'?d:d.message||'生成失败';ElMessage.error(msg);gen.value=false}
           }catch(e){console.warn('SSE parse:',e,dl?.substring(0,80))}
@@ -816,55 +801,7 @@ async function genScnImg(s,i){
   }catch{ElMessage.error('生成失败')}
 }
 
-// Incremental scene image generation — called on each chapter_done as fallback
-// Only generates ONE scene at a time to avoid overwhelming the API
-// The backend SSE scene_image events handle the primary push
-let autoGenIdx = 0; let autoGenBusy = false
-async function autoGenScenesForNew() {
-  if (autoGenBusy) return // Prevent concurrent calls
-  autoGenBusy = true
-  try {
-    for (let i = autoGenIdx; i < sceneImgs.value.length; i++) {
-      if (!sceneImgs.value[i].image) {
-        try {
-          const s = sceneImgs.value[i]
-          const r = await api.post('/ai/image/scene', {
-            projectId: Number(pid), sceneIndex: i,
-            description: s.description || s.action || '', location: s.location, time: s.time, mood: s.mood || ''
-          })
-          sceneImgs.value[i] = { ...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt }
-          autoGenIdx = i + 1
-          return // Only one per call — let next chapter_done trigger more
-        } catch { /* skip, try next time */ }
-      } else {
-        autoGenIdx = i + 1 // Skip scenes that already have images
-      }
-    }
-  } finally { autoGenBusy = false }
-}
-// Reset autoGenIdx when starting fresh generation (called in doGen via SSE)
-function resetAutoGenIdx() { autoGenIdx = 0 }
-
-// Auto-generate scene images after script generation (full sweep, called on done)
-async function autoGenScenes() {
-  let count = 0
-  for (let i = 0; i < sceneImgs.value.length; i++) {
-    if (!sceneImgs.value[i].image) {
-      try {
-        const s = sceneImgs.value[i]
-        const r = await api.post('/ai/image/scene', {
-          projectId: Number(pid), sceneIndex: i,
-          description: s.description || s.action || '', location: s.location, time: s.time, mood: s.mood || ''
-        })
-        sceneImgs.value[i] = { ...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt }
-        count++
-      } catch { /* skip */ }
-    }
-  }
-  if (count > 0) ElMessage.success(`已自动生成 ${count} 张场景图`)
-}
-
-// Batch generate all scene images
+// Batch generate all scene images (manual trigger only)
 const genAllScenesBusy = ref(false)
 async function genAllScenes() {
   genAllScenesBusy.value = true
@@ -1113,12 +1050,12 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .scene-card-actions{display:flex;gap:4px;justify-content:flex-end}
 
 /* Research */
-.research{padding:10px}
+.research{display:flex;flex-direction:column;height:100%;padding:10px;overflow:hidden}
 .research :deep(.el-input__wrapper){background:var(--color-bg-alt);border-color:var(--color-border);box-shadow:none}
 .research :deep(.el-input__inner){color:var(--color-text)}
 .research :deep(.el-button--primary){background:var(--c-gold);border-color:var(--c-gold);color:var(--c-darker)}
 .research :deep(.el-button--primary):hover{background:var(--c-gold-light)}
-.sres{margin-top:12px;padding:12px;background:var(--color-bg-alt);border-radius:var(--radius-lg);font-size:13px;line-height:1.7;max-height:400px;overflow:auto;border:1px solid var(--color-border-light)}
+.sres{margin-top:12px;padding:12px;background:var(--color-bg-alt);border-radius:var(--radius-lg);font-size:13px;line-height:1.7;flex:1;overflow:auto;border:1px solid var(--color-border-light)}
 .sres :deep(h1),.sres :deep(h2),.sres :deep(h3),.sres :deep(h4){color:var(--c-gold);margin:12px 0 6px}
 .sres :deep(strong){color:var(--c-gold-light)}
 .sres :deep(code){background:rgba(212,168,83,0.1);padding:2px 6px;border-radius:3px;font-size:12px}

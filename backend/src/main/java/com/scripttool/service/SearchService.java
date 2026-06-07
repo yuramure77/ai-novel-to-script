@@ -51,7 +51,7 @@ public class SearchService {
                             Map.of("role", "system", "content", "你是一个专业的研究助手，帮助编剧收集创作素材和参考资料。"),
                             Map.of("role", "user", "content", prompt)
                     ),
-                    "max_tokens", 1024,
+                    "max_tokens", 4096,
                     "temperature", 0.3
             );
 

@@ -15,8 +15,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Script generation with task-based plan persistence.
@@ -27,8 +25,6 @@ import java.util.concurrent.Executors;
 public class ScriptService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptService.class);
-    private static final ExecutorService sceneImgExecutor = Executors.newFixedThreadPool(1); // TokenHub limit: 1 concurrent job
-
     private final ProjectService projectService;
     private final ChapterSplitService chapterSplitService;
     private final ScriptGenService scriptGenService;
@@ -197,7 +193,6 @@ public class ScriptService {
 
                 User user = userService.getById(userId);
                 final String authorName = user.getNickname() != null ? user.getNickname() : user.getUsername();
-                final Set<Integer> imgGenDispatched = Collections.synchronizedSet(new HashSet<>());
 
                 // ── ⑥ Execute chapter by chapter ──
                 for (int i = startChapter; i < total; i++) {
@@ -301,37 +296,6 @@ public class ScriptService {
 
                     // Save ScriptVersion snapshot
                     ScriptVersion sv = projectService.saveScriptVersion(projectId, accumulatedYaml);
-
-                    // ── Incremental scene image generation ──
-                    if (r.scenes() != null && !r.scenes().isEmpty()) {
-                        List<Map<String, Object>> allScenes = fplan.getAccumulatedScenes();
-                        for (int si = 0; si < allScenes.size(); si++) {
-                            final int sceneIdx = si;
-                            if (!imgGenDispatched.contains(sceneIdx)) {
-                                imgGenDispatched.add(sceneIdx);
-                                final Map<String, Object> s = allScenes.get(si);
-                                sceneImgExecutor.submit(() -> {
-                                    try {
-                                        String desc = Objects.toString(s.get("description"), "");
-                                        String location = Objects.toString(s.get("location"), "");
-                                        String time = Objects.toString(s.get("time"), "");
-                                        String mood = Objects.toString(s.get("mood"), "");
-                                        Map<String, Object> img = imageService.generateSceneImage(
-                                            projectId, sceneIdx, desc, location, time, mood);
-                                        send(emitter, "scene_image", data(
-                                            "index", sceneIdx,
-                                            "url", img.get("url"),
-                                            "prompt", img.get("prompt"),
-                                            "title", desc.isBlank() ? "场景" + (sceneIdx + 1) : desc
-                                        ));
-                                    } catch (Exception ex) {
-                                        log.warn("Scene image gen failed idx={}: {}", sceneIdx, ex.getMessage());
-                                        log.debug("Scene image gen stack trace", ex);
-                                    }
-                                });
-                            }
-                        }
-                    }
 
                     int pct = (int)((double)(i + 1) / total * 100);
                     send(emitter, "chapter_done", data(
