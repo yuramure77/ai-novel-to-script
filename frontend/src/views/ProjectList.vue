@@ -79,6 +79,25 @@
           <button :class="['rf-btn', {on: roleFilter==='read'}]" @click="roleFilter='read'">👁 只读</button>
         </div>
 
+        <!-- Batch action bar -->
+        <div v-if="selectedIds.size" class="batch-bar">
+          <span class="batch-count">已选 <strong>{{ selectedIds.size }}</strong> 项</span>
+          <el-button size="small" text @click="selectAll">全选 ({{ filtered.length }})</el-button>
+          <el-button size="small" text @click="selectedIds.clear()">取消选择</el-button>
+          <div class="batch-actions">
+            <el-dropdown trigger="click" @command="batchMove">
+              <el-button size="small" type="warning" plain>📁 移至文件夹</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="null">📁 取消分类</el-dropdown-item>
+                  <el-dropdown-item v-for="f in folders" :key="f.id" :command="String(f.id)">📁 {{ f.name }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button size="small" type="danger" plain @click="batchDelete">🗑 批量删除</el-button>
+          </div>
+        </div>
+
         <!-- Quick start -->
         <div class="quick-start" @click="showCreate=true">
           <div class="qs-icon">＋</div>
@@ -87,7 +106,8 @@
 
         <!-- Project grid -->
         <div v-if="filtered.length" class="grid stagger-in">
-          <div v-for="p in filtered" :key="p.id" class="card" @click="$router.push(`/project/${p.id}`)">
+          <div v-for="p in filtered" :key="p.id" :class="['card', {selected: selectedIds.has(p.id)}]" @click="onCard(p)">
+            <div class="card-check" @click.stop="toggleSel(p.id)"><span v-if="selectedIds.has(p.id)">✓</span></div>
             <div class="card-top-bar" :class="p.status.toLowerCase()"></div>
             <div class="card-inner">
               <div class="card-head">
@@ -164,7 +184,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { listProjects, createProject, deleteProject } from '@/api/projects'
 import { uploadFile } from '@/api/files'
 import { listFolders, createFolder, renameFolder, deleteFolder, moveProject } from '@/api/folders'
@@ -197,6 +217,28 @@ const dialogWidth = ref('640px')
 function onResize() { dialogWidth.value = window.innerWidth < 768 ? '95%' : '640px' }
 const searchQuery = ref('')
 const roleFilter = ref('all')
+const selectedIds = ref(new Set())
+
+function toggleSel(id) { const s = new Set(selectedIds.value); if (s.has(id)) s.delete(id); else s.add(id); selectedIds.value = s }
+function selectAll() { selectedIds.value = new Set(filtered.value.map(p => p.id)) }
+function onCard(p) {
+  if (selectedIds.value.size) { toggleSel(p.id); return }
+  router.push(`/project/${p.id}`)
+}
+async function batchDelete() {
+  try { await ElMessageBox.confirm(`确认删除 ${selectedIds.value.size} 个项目？此操作不可恢复。`, '批量删除', { type: 'warning', confirmButtonText: '确认删除' }) } catch { return }
+  const ids = [...selectedIds.value]
+  for (const id of ids) { try { await deleteProject(id) } catch {} }
+  selectedIds.value = new Set()
+  load()
+}
+async function batchMove(folderId) {
+  const ids = [...selectedIds.value]
+  for (const id of ids) { try { await moveProject(id, folderId === 'null' ? null : Number(folderId)) } catch {} }
+  selectedIds.value = new Set()
+  load()
+}
+
 const filtered = computed(() => {
   let list = currentFolder.value === null ? projects.value : projects.value.filter(p => p.folderId === currentFolder.value)
   if (roleFilter.value === 'owner') list = list.filter(p => p.isOwner)
@@ -311,6 +353,25 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .search-input :deep(.el-input__wrapper.is-focus) { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) inset }
 
 .role-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap }
+
+.batch-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; margin-bottom: 14px;
+  background: var(--c-gold); color: var(--c-darker);
+  border-radius: var(--radius-md); font-size: 13px;
+}
+.batch-bar strong { font-size: 15px }
+.batch-actions { margin-left: auto; display: flex; gap: 8px }
+
+.card-check {
+  position: absolute; top: 8px; left: 10px; z-index: 2;
+  width: 22px; height: 22px; border: 2px solid var(--color-border);
+  border-radius: 4px; background: var(--color-surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--c-darker); transition: all var(--transition);
+}
+.card.selected .card-check { background: var(--c-gold); border-color: var(--c-gold) }
+.card.selected { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) }
 .rf-btn {
   padding: 6px 16px; border-radius: 20px; border: 1px solid var(--color-border);
   background: var(--color-surface); color: var(--color-text-muted); cursor: pointer;
