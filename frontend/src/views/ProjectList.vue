@@ -54,7 +54,7 @@
         <!-- Add folder input -->
         <div v-if="showAddFolder" class="add-folder">
           <el-input v-model="newFolderName" size="small" placeholder="文件夹名" @keyup.enter="addF" ref="folderInput" />
-          <el-button size="small" @click="addF" type="primary">确定</el-button>
+          <el-button size="small" @click="addF" type="warning">确定</el-button>
           <el-button size="small" @click="showAddFolder=false">取消</el-button>
         </div>
       </aside>
@@ -140,7 +140,7 @@
     <!-- Rename folder dialog -->
     <el-dialog v-model="showRename" title="重命名文件夹" width="400px">
       <el-input v-model="renameFolderName" placeholder="新名称" @keyup.enter="doRenameF" />
-      <template #footer><el-button @click="showRename=false">取消</el-button><el-button type="primary" @click="doRenameF">确定</el-button></template>
+      <template #footer><el-button @click="showRename=false">取消</el-button><el-button type="warning" @click="doRenameF">确定</el-button></template>
     </el-dialog>
 
     <!-- Share dialog -->

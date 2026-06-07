@@ -3,7 +3,7 @@
     <!-- Top bar -->
     <header class="tb">
       <div class="tbl">
-        <el-button text size="small" @click="$router.push('/projects')">← 返回</el-button>
+        <el-button text size="small" @click="$router.push('/projects')" style="color:var(--c-gold)">← 返回</el-button>
         <h2 v-if="!renaming" @dblclick="startRename" title="双击重命名">{{ projectTitle }}</h2>
         <el-input v-else v-model="renameTitle" size="small" style="width:240px" @blur="doRename" @keyup.enter="doRename" ref="renameRef" />
         <el-tag :type="stTag" size="small" round>{{ stText }}</el-tag>
@@ -12,7 +12,7 @@
       <div class="tbr">
         <el-switch v-model="dark" inline-prompt active-text="🌙" inactive-text="☀️" @change="tDark" size="small" />
         <el-dropdown v-if="latestVersion" @command="expCmd">
-          <el-button size="small">导出 ▾</el-button>
+          <el-button size="small" type="warning" plain>📥 导出 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="yaml">YAML</el-dropdown-item>
@@ -21,7 +21,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" v-if="latestVersion" @click="showHist=true">历史</el-button>
+        <el-button size="small" v-if="latestVersion" @click="showHist=true" type="warning" plain>📜 历史</el-button>
       </div>
     </header>
 
@@ -36,12 +36,12 @@
     <!-- Actions -->
     <div class="act">
       <div class="actl">
-        <el-button size="small" @click="doSplit" :loading="splitting" :disabled="isReadOnly">分章</el-button>
+        <el-button size="small" type="warning" @click="doSplit" :loading="splitting" :disabled="isReadOnly">⚡ 分章</el-button>
         <span v-if="chapters.length" class="hint">{{ chapters.length }} 章</span>
         <span v-if="!isReadOnly" class="hint" style="color:var(--color-text-muted);margin-left:8px">Ctrl+F 搜索 · Ctrl+Enter 生成 · Ctrl+S 保存</span>
       </div>
-      <el-button v-if="!isReadOnly" type="primary" @click="doGen()" :loading="gen" :disabled="gen">
-        {{ gen ? progressMsg : '生成剧本' }}
+      <el-button v-if="!isReadOnly" size="default" type="warning" @click="doGen()" :loading="gen" :disabled="gen" style="font-weight:700;letter-spacing:1px">
+        {{ gen ? progressMsg : '🎬 生成剧本' }}
       </el-button>
       <el-tag v-else type="info" size="small">只读模式 — 仅可查看</el-tag>
     </div>
