@@ -158,12 +158,16 @@
             <div class="chars">
               <div v-if="chars.length" class="clist">
                 <div v-for="(c,i) in chars" :key="i" class="ccard">
-                  <img v-if="c.image" :src="c.image" class="cimg" @click="genCharImg(c,i)" :title="'点击重新生成 ' + c.name + ' 的形象图'" />
+                  <img v-if="c.image" :src="c.image" class="cimg" @click="previewImg(c.image, c.prompt)" title="点击放大查看" />
                   <div v-else class="cimgplc" @click="genCharImg(c,i)">点击生成形象</div>
                   <div class="chead"><strong>{{ c.name }}</strong><el-tag size="small" round>{{ rl(c.role) }}</el-tag></div>
                   <p v-if="c.description">{{ c.description }}</p>
                   <div v-if="c.traits?.length" class="ctraits">
                     <el-tag v-for="t in c.traits" :key="t" size="small" effect="plain" round>{{ t }}</el-tag>
+                  </div>
+                  <div v-if="c.image" style="display:flex;gap:8px;margin-top:4px">
+                    <el-button size="small" text type="warning" @click="genCharImg(c,i)">🔄 重新生成</el-button>
+                    <el-button size="small" text @click="showImgVer('CHARACTER', i)">📋 历史</el-button>
                   </div>
                 </div>
               </div>
@@ -179,13 +183,19 @@
                   <el-carousel-item v-for="(s,i) in sceneImgs" :key="i">
                     <div class="carousel-slide">
                       <div class="simgt">场景 {{ i+1 }}: {{ s.title }}</div>
-                      <img v-if="s.image" :src="s.image" class="simg" @click="genScnImg(s,i)" title="点击重新生成" />
+                      <img v-if="s.image" :src="s.image" class="simg" @click="previewImg(s.image, s.prompt)" title="点击放大查看" />
                       <div v-else class="simgplc" @click="genScnImg(s,i)">点击生成场景图</div>
-                      <el-button size="small" text @click="genScnImg(s,i)" v-if="!s.image" style="margin-top:8px">AI 生成</el-button>
+                      <div class="scene-actions">
+                        <el-button size="small" text @click="genScnImg(s,i)" v-if="!s.image">AI 生成</el-button>
+                        <template v-if="s.image">
+                          <el-button size="small" text type="warning" @click="genScnImg(s,i)">🔄 重新生成</el-button>
+                          <el-button size="small" text @click="showImgVer('SCENE', i)">📋 历史</el-button>
+                        </template>
+                      </div>
                     </div>
                   </el-carousel-item>
                 </el-carousel>
-                <p style="font-size:11px;color:var(--color-text-muted);text-align:center;margin-top:8px">💡 点击图片重新生成 · 免费 AI 生图</p>
+                <p style="font-size:11px;color:var(--color-text-muted);text-align:center;margin-top:8px">💡 点击图片放大 · 点击按钮重新生成</p>
               </div>
               <el-empty v-else description="生成剧本后可预览场景图" />
             </div>
@@ -214,6 +224,29 @@
           <el-button size="small" text @click="dl(v.id)">下载</el-button></div>
       </div></div><el-empty v-else/>
     </el-drawer>
+
+    <!-- Image preview dialog -->
+    <el-dialog v-model="showPreview" title="图片预览" width="auto" :close-on-click-modal="true" :append-to-body="true">
+      <img :src="previewUrl" style="max-width:90vw;max-height:80vh;border-radius:8px" @click="showPreview=false" />
+      <p v-if="previewPrompt" style="color:var(--color-text-muted);font-size:12px;margin-top:8px;max-width:90vw">📝 {{ previewPrompt }}</p>
+    </el-dialog>
+
+    <!-- Image version history dialog -->
+    <el-dialog v-model="showVerDialog" title="图片版本历史" width="480px" :append-to-body="true">
+      <div v-if="imgVersions.length">
+        <div v-for="v in imgVersions" :key="v.id" class="ver-item"
+             style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--color-border);cursor:pointer"
+             @click="applyVersion(v)">
+          <div>
+            <img :src="v.url" style="width:60px;height:60px;object-fit:cover;border-radius:6px" />
+            <span style="margin-left:10px;font-size:12px;color:var(--color-text-muted)">{{ fmt(v.createdAt) }}</span>
+          </div>
+          <el-button size="small" type="primary" text>应用</el-button>
+        </div>
+      </div>
+      <el-empty v-else description="暂无历史版本" />
+      <template #footer><el-button @click="showVerDialog=false">关闭</el-button></template>
+    </el-dialog>
   </div>
 </template>
 
@@ -258,6 +291,31 @@ const searchOn = ref(false); const sq = ref(''); const sc = ref(0); const sr = r
 
 // Research
 const rq = ref(''); const srching = ref(false); const sres = ref('')
+
+// Image preview
+const showPreview = ref(false); const previewUrl = ref(''); const previewPrompt = ref('')
+function previewImg(url, prompt) { previewUrl.value = url; previewPrompt.value = prompt || ''; showPreview.value = true }
+
+// Image version history
+const showVerDialog = ref(false); const imgVersions = ref([])
+const verType = ref(''); const verIndex = ref(0)
+async function showImgVer(type, index) {
+  verType.value = type; verIndex.value = index
+  try {
+    const r = await api.get('/ai/image/versions', { params: { projectId: pid, type, index } })
+    imgVersions.value = r.data.data || []
+    showVerDialog.value = true
+  } catch { ElMessage.error('加载版本失败') }
+}
+function applyVersion(v) {
+  if (verType.value === 'CHARACTER') {
+    chars.value[verIndex.value] = { ...chars.value[verIndex.value], image: v.url, prompt: v.prompt }
+  } else {
+    sceneImgs.value[verIndex.value] = { ...sceneImgs.value[verIndex.value], image: v.url, prompt: v.prompt }
+  }
+  showVerDialog.value = false
+  ElMessage.success('已切换版本')
+}
 
 // UI
 const rt = ref('chat'); const showR = ref(true); const dark = ref(false)
@@ -516,8 +574,11 @@ function renderMd(t){
 async function genCharImg(c,i){
   try{
     ElMessage.info('正在生成 '+(c.name||'角色')+' 的形象...')
-    const r=await api.post('/ai/image/character',{name:c.name,description:c.description,traits:c.traits||[]})
-    chars.value[i] = {...chars.value[i], image: r.data.data.url}
+    const r=await api.post('/ai/image/character',{
+      projectId: Number(pid), charIndex: i,
+      name: c.name, description: c.description, traits: c.traits || []
+    })
+    chars.value[i] = {...chars.value[i], image: r.data.data.url, prompt: r.data.data.prompt}
   }catch{ElMessage.error('生成失败')}
 }
 
@@ -525,8 +586,11 @@ async function genCharImg(c,i){
 async function genScnImg(s,i){
   try{
     ElMessage.info('正在生成场景图...')
-    const r=await api.post('/ai/image/scene',{description:s.description,location:s.location,time:s.time,mood:''})
-    sceneImgs.value[i] = {...sceneImgs.value[i], image: r.data.data.url}
+    const r=await api.post('/ai/image/scene',{
+      projectId: Number(pid), sceneIndex: i,
+      description: s.description, location: s.location, time: s.time, mood: ''
+    })
+    sceneImgs.value[i] = {...sceneImgs.value[i], image: r.data.data.url, prompt: r.data.data.prompt}
   }catch{ElMessage.error('生成失败')}
 }
 

@@ -2,6 +2,10 @@ package com.scripttool.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scripttool.config.DeepSeekConfig;
+import com.scripttool.model.entity.ImageVersion;
+import com.scripttool.model.entity.ImageVersion.ImageType;
+import com.scripttool.repository.ImageVersionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -27,123 +31,166 @@ public class ImageService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final DeepSeekConfig deepSeekConfig;
 
     @Autowired(required = false)
     private CosService cosService;
 
-    public ImageService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    @Autowired
+    private ImageVersionRepository versionRepo;
+
+    public ImageService(RestTemplate restTemplate, ObjectMapper objectMapper,
+                        DeepSeekConfig deepSeekConfig) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.deepSeekConfig = deepSeekConfig;
     }
 
-    public String generateSceneImage(String desc, String location, String time, String mood) {
-        // Build rich cinematic scene prompt
-        StringBuilder sb = new StringBuilder();
-        sb.append("电影级场景，");
+    /**
+     * Generate scene image with DeepSeek-enriched prompt + COS upload + version save.
+     */
+    public Map<String, Object> generateSceneImage(Long projectId, int sceneIndex,
+                                                   String desc, String location, String time, String mood) {
+        // 1. Build rich prompt via DeepSeek
+        String base = String.format("场景：%s。地点：%s。时辰：%s。氛围：%s。",
+                desc != null ? desc : "戏剧场景",
+                location != null ? location : "古代中国",
+                time != null ? time : "黄昏",
+                mood != null && !mood.isBlank() ? mood : "戏剧性");
+        String visualDesc = enrichPrompt("场景", base);
+        String prompt = visualDesc + "，电影级构图与光影，广角镜头，丰富的环境细节，"
+                + "史诗感，古装大片风格，高质量渲染，8K超清画质";
 
-        if (desc != null && !desc.isBlank()) {
-            sb.append(desc).append("，");
-        }
+        // 2. Generate image
+        String url = generateWithTokenHub(prompt);
 
-        sb.append("地点：").append(location != null ? location : "古代中国").append("，");
-        sb.append("时辰：").append(time != null ? time : "黄昏").append("，");
+        // 3. Save version
+        versionRepo.save(new ImageVersion(projectId, ImageType.SCENE, sceneIndex, url, prompt));
 
-        if (mood != null && !mood.isBlank()) {
-            sb.append("氛围：").append(mood).append("，");
-        }
-
-        sb.append("中国古代美学，电影构图与光影，广角镜头，");
-        sb.append("丰富的环境细节，史诗感，古装大片风格，高质量渲染，8K超清画质");
-
-        return generateWithTokenHub(sb.toString(), "scene");
+        return Map.of("url", url, "prompt", prompt);
     }
 
-    public String generateCharacterImage(String name, String description, List<String> traits) {
-        // Build high-quality character portrait prompt
-        StringBuilder sb = new StringBuilder();
-        sb.append("古风人物写真，");
-
-        // Character identity
-        if (name != null && !name.isBlank()) {
-            sb.append("角色「").append(name).append("」");
-        }
-
-        // Visual description from AI analysis
+    /**
+     * Generate character image with DeepSeek-enriched visual description + COS + version save.
+     */
+    public Map<String, Object> generateCharacterImage(Long projectId, int charIndex,
+                                                       String name, String description, List<String> traits) {
+        // 1. Build deep character visual description via DeepSeek
+        StringBuilder base = new StringBuilder();
+        base.append("角色名：").append(name != null ? name : "未知角色").append("。");
         if (description != null && !description.isBlank()) {
-            sb.append("，").append(description);
-        } else {
-            sb.append("，中国古代人物");
+            base.append("角色描述：").append(description).append("。");
         }
-
-        // Personality traits → visual atmosphere
         if (traits != null && !traits.isEmpty()) {
-            sb.append("，性格气质：").append(String.join("、", traits));
+            base.append("性格特征：").append(String.join("、", traits)).append("。");
         }
 
-        // Artistic direction — Chinese historical drama portrait style
-        sb.append("，中国古代服饰，精致发冠与头饰，电影人像摄影，");
-        sb.append("柔和自然侧光，半身肖像构图，浅景深背景虚化，");
-        sb.append("精致五官细节，皮肤质感真实，古装剧定妆照风格，");
-        sb.append("高品质，8K超清");
+        String visualDesc = enrichPrompt("角色", base.toString());
+        String prompt = visualDesc + "，古风人物写真，中国古代服饰，精致发冠与头饰，"
+                + "电影人像摄影，柔和自然侧光，半身肖像构图，浅景深背景虚化，"
+                + "精致五官细节，皮肤质感真实，古装剧定妆照风格，高品质，8K超清";
 
-        return generateWithTokenHub(sb.toString(), "character");
+        // 2. Generate image
+        String url = generateWithTokenHub(prompt);
+
+        // 3. Save version
+        versionRepo.save(new ImageVersion(projectId, ImageType.CHARACTER, charIndex, url, prompt));
+
+        return Map.of("url", url, "prompt", prompt);
+    }
+
+    /**
+     * Use DeepSeek to generate a visually-rich Chinese description for AI image generation.
+     * Falls back to the original base text if DeepSeek call fails.
+     */
+    private String enrichPrompt(String type, String baseInfo) {
+        try {
+            String systemPrompt = type.equals("角色")
+                ? "你是一位古装影视剧造型师和美术指导。请根据角色信息，创作一段适合AI图像生成的外貌描写。"
+                  + "必须包含：面容特征、发型头饰、服饰风格、气质氛围。用流畅中文描述，80字以内，不要分段编号。"
+                  + "参考经典文学作品的描写手法，如《红楼梦》的人物出场描写。"
+                : "你是一位古装影视剧美术指导。请根据场景信息，创作一段适合AI图像生成的环境描写。"
+                  + "必须包含：环境氛围、光影色调、建筑或自然景观细节。用流畅中文描述，80字以内，不要分段编号。";
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", deepSeekConfig.getModel());
+            body.put("messages", List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", baseInfo + "\n请输出视觉描写：")
+            ));
+            body.put("max_tokens", 300);
+            body.put("temperature", 0.8);
+
+            HttpHeaders headers = deepSeekConfig.createHeaders();
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            String response = restTemplate.postForObject(deepSeekConfig.getApiUrl(), entity, String.class);
+
+            JsonNode root = objectMapper.readTree(response);
+            String content = root.path("choices").get(0).path("message").path("content").asText();
+            return content != null && !content.isBlank() ? content.trim() : baseInfo;
+        } catch (Exception e) {
+            System.err.println("[ImageService] DeepSeek enrichment failed: " + e.getMessage());
+            return baseInfo; // fallback to original
+        }
     }
 
     /**
      * Call TokenHub hy-image-lite API, then upload to COS for permanent storage.
-     * Falls back gracefully if COS is not configured.
      */
-    private String generateWithTokenHub(String prompt, String prefix) {
+    private String generateWithTokenHub(String prompt) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        Map<String, Object> body = Map.of(
+            "model", model,
+            "prompt", prompt,
+            "rsp_img_type", "url"
+        );
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
+        JsonNode root;
         try {
-            // 1. Call TokenHub hy-image-lite
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
-            Map<String, Object> body = Map.of(
-                "model", model,
-                "prompt", prompt,
-                "rsp_img_type", "url"
-            );
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
-            JsonNode root = objectMapper.readTree(response.getBody());
-
-            // Parse: {"data": [{"url": "..."}]}
-            String imageUrl = null;
-            JsonNode data = root.get("data");
-            if (data != null && data.isArray() && data.size() > 0) {
-                imageUrl = data.get(0).get("url").asText();
-            } else if (root.get("url") != null) {
-                imageUrl = root.get("url").asText();
-            }
-
-            if (imageUrl == null || imageUrl.isEmpty()) {
-                throw new RuntimeException("TokenHub returned no image URL");
-            }
-
-            // 2. Upload to COS for permanent URL (if configured)
-            if (!cosBucket.isEmpty() && cosService != null) {
-                try {
-                    byte[] imageBytes = cosService.downloadImage(imageUrl);
-                    return cosService.uploadImage(imageBytes, prefix);
-                } catch (Exception e) {
-                    System.err.println("[ImageService] COS upload failed: " + e.getMessage());
-                    return imageUrl; // fallback to TokenHub temp URL
-                }
-            }
-
-            return imageUrl;
+            root = objectMapper.readTree(response.getBody());
         } catch (Exception e) {
-            System.err.println("[ImageService] TokenHub failed: " + e.getMessage());
-            return fallback(prompt);
+            throw new RuntimeException("Failed to parse TokenHub response", e);
         }
+
+        String imageUrl = null;
+        JsonNode data = root.get("data");
+        if (data != null && data.isArray() && data.size() > 0) {
+            imageUrl = data.get(0).get("url").asText();
+        } else if (root.get("url") != null) {
+            imageUrl = root.get("url").asText();
+        }
+
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            throw new RuntimeException("TokenHub returned no image URL: " + response.getBody());
+        }
+
+        // Upload to COS for permanent URL
+        if (!cosBucket.isEmpty() && cosService != null) {
+            try {
+                byte[] imageBytes = cosService.downloadImage(imageUrl);
+                return cosService.uploadImage(imageBytes, "image");
+            } catch (Exception e) {
+                System.err.println("[ImageService] COS upload failed: " + e.getMessage());
+            }
+        }
+
+        return imageUrl;
     }
 
-    private String fallback(String prompt) {
-        return "https://image.pollinations.ai/prompt/" +
-                prompt.replace(" ", "%20").replace(",", "%2C") +
-                "?width=768&height=768&nologo=true";
+    /** List image versions for a specific character/scene */
+    public List<ImageVersion> getVersions(Long projectId, ImageType type, Integer index) {
+        return versionRepo.findByProjectIdAndImageTypeAndTargetIndexOrderByCreatedAtDesc(
+                projectId, type, index);
+    }
+
+    /** Get a specific version by ID */
+    public ImageVersion getVersion(Long versionId) {
+        return versionRepo.findById(versionId)
+                .orElseThrow(() -> new RuntimeException("版本不存在"));
     }
 }
