@@ -12,7 +12,8 @@
 - **自动分章** — 支持中文（第一/二/三章）和英文（Chapter 1/2/3）章节标记
 - **AI 角色提取** — DeepSeek 自动识别角色、性格特征、人物关系
 - **逐章场景生成** — 每个章节独立生成场景 beats（对白、动作、氛围）
-- **SSE 流式输出** — 实时显示生成进度，支持断点续传（resume）
+- **SSE 流式输出** — 实时显示生成进度，支持断点续传
+- **1000字块号检查点** — 文本按千字分块，位图标记进度，中断自动续写，已完成块直接跳过
 - **100万字上限** — 支持超长篇小说全文处理
 
 ### 🎨 AI 图像生成
@@ -33,6 +34,7 @@
 - **YAML** — 结构化剧本原始格式
 - **Markdown** — 适合阅读和分享的排版
 - **Fountain** — 标准剧本格式，可直接导入 Final Draft 等专业软件
+- **TXT** — 纯文本格式，通用性最强
 
 ### 🎭 前端特效
 - **暗色/亮色切换** — 主题自适应
@@ -260,6 +262,17 @@ npm run dev
 | project_id | BIGINT FK | 项目 |
 | user_id | BIGINT FK | 用户 |
 | permission | VARCHAR(20) | ADMIN/READ |
+
+### generation_progress（生成检查点）
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| project_id | BIGINT FK UNIQUE | 项目 |
+| total_chunks | INT | 总块数（1000字/块） |
+| chunk_map | VARCHAR(10000) | 位图（1=已完成, 0=待处理） |
+| partial_yaml | CLOB | 累积的部分 YAML |
+| version_number | INT | 对应版本号 |
+| updated_at | TIMESTAMP | 更新时间 |
 
 ### image_versions
 | 字段 | 类型 | 说明 |
