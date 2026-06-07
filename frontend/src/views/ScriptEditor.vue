@@ -48,7 +48,17 @@
     </div>
 
     <!-- Progress -->
-    <div v-if="gen" class="prog"><el-progress :percentage="progressPct" :stroke-width="2" :show-text="true"/><p class="prog-msg">{{ progressMsg }}</p></div>
+    <div v-if="gen" class="prog">
+      <el-progress :percentage="progressPct" :stroke-width="2" :show-text="true"/>
+      <p class="prog-msg">{{ progressMsg }}</p>
+      <!-- Chapter status pills -->
+      <div v-if="planChapters.length" class="plan-chaps">
+        <span v-for="(pc, i) in planChapters" :key="i" :class="['pc-chip', pc.status]"
+          :title="'第'+(i+1)+'章: '+pc.title + (pc.status==='DONE'?' ✅':pc.status==='IN_PROGRESS'?' 🔄':' ⬜')">
+          {{ pc.status === 'DONE' ? '✅' : pc.status === 'IN_PROGRESS' ? '🔄' : '⬜' }} {{ i+1 }}
+        </span>
+      </div>
+    </div>
 
     <!-- Chapters -->
     <div v-if="chapters.length" class="chaps">
@@ -316,6 +326,9 @@ const chars = ref([])
 // Scenes (for image gen)
 const sceneImgs = ref([])
 
+// Plan chapters (from backend plan event)
+const planChapters = ref([])
+
 // Search
 const searchOn = ref(false); const sq = ref(''); const sc = ref(0); const sr = ref(null); const tp = ref(null)
 
@@ -539,7 +552,7 @@ async function doSplit(){splitting.value=true;try{const r=await splitChapters(pi
 
 // Generate SSE
 function doGen(){
-  gen.value=true;progressMsg.value='连接中...';resetAutoGenIdx()
+  gen.value=true;progressMsg.value='连接中...';resetAutoGenIdx();planChapters.value=[]
   // Keep existing yaml visible during reconnect — don't clear yaml.value
   fetch(`/api/projects/${pid}/generate/stream`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
     .then(r=>{const reader=r.body.getReader(),dec=new TextDecoder();let buf=''
@@ -554,14 +567,34 @@ function doGen(){
           }
           try{const d=JSON.parse(dl.replace('data:','').trim())
             if(ev==='progress'){progressMsg.value=d.message||'';if(d.percent)progressPct.value=d.percent}
+            else if(ev==='plan'){
+              // Received chapter plan from backend
+              if(d.chapters) planChapters.value = d.chapters
+              if(d.totalChapters) totalChapters.value = d.totalChapters
+              progressMsg.value = '规划完毕: ' + d.totalChapters + ' 章，开始逐章生成...'
+            }
+            else if(ev==='chapter_start'){
+              // Highlight current chapter in plan
+              if(d.chapter && planChapters.value.length){
+                const idx = d.chapter - 1
+                if(idx >= 0 && idx < planChapters.value.length){
+                  planChapters.value[idx] = { ...planChapters.value[idx], status: 'IN_PROGRESS' }
+                }
+              }
+              progressMsg.value = '正在生成第' + d.chapter + '章: ' + (d.title||'')
+            }
             else if(ev==='resume_data'){
               // Show existing partial YAML immediately on resume
               if(d.yamlContent){
                 yaml.value=d.yamlContent
                 latestVersion.value={id:d.versionId,versionNumber:d.versionNumber}
               }
+              // Restore chapter plan
+              if(d.chapters) planChapters.value = d.chapters
               progressMsg.value=d.message||'续写中...'
-              if(d.completedChunks !== undefined) progressPct.value = Math.round(d.completedChunks / d.totalChunks * 100)
+              if(d.completedChapters !== undefined && d.totalChapters) {
+                progressPct.value = Math.round(d.completedChapters / d.totalChapters * 100)
+              }
               // Restore existing images after YAML watchers parse characters/scenes
               nextTick(() => { restoreImages() })
             }
@@ -571,7 +604,13 @@ function doGen(){
                 latestVersion.value={id:d.versionId,versionNumber:d.versionNumber}
               }
               if(d.percent)progressPct.value=d.percent
-              progressMsg.value='生成中...'
+              // Update chapter plan from backend
+              if(d.chapters) planChapters.value = d.chapters
+              if(d.completedChapters !== undefined) {
+                progressMsg.value = '已完成: ' + d.completedChapters + '/' + d.totalChapters + ' 章'
+              } else {
+                progressMsg.value='生成中...'
+              }
               // Fallback: trigger scene image generation for newly available scenes
               nextTick(() => { autoGenScenesForNew() })
             }
@@ -889,6 +928,14 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .actl{display:flex;align-items:center;gap:12px}
 .hint{color:var(--color-text-muted);font-size:11px}
 .prog{padding:8px 14px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border-light);flex-shrink:0}
+.prog-msg{font-size:12px;color:var(--color-text-muted);margin:4px 0 0}
+/* Chapter plan chips */
+.plan-chaps{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pc-chip{font-size:10px;padding:2px 6px;border-radius:10px;cursor:default;transition:all .2s;border:1px solid var(--color-border)}
+.pc-chip.PENDING{color:var(--color-text-muted);background:transparent}
+.pc-chip.IN_PROGRESS{color:var(--c-gold);border-color:var(--c-gold);background:rgba(212,168,83,0.12);animation:pulse 1.5s infinite}
+.pc-chip.DONE{color:var(--color-success,#7b9b6a);border-color:var(--color-success,#7b9b6a);background:rgba(123,155,106,0.08)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .chaps{display:flex;gap:6px;padding:8px 12px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border-light);overflow-x:auto;flex-shrink:0;align-items:center}
 .ch{flex-shrink:0;padding:4px 14px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;white-space:nowrap;transition:all .2s ease;font-family:var(--font-serif)}
 .ch:hover{color:var(--c-gold);border-color:var(--c-gold);box-shadow:0 0 8px rgba(212,168,83,0.15)}
