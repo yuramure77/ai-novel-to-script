@@ -37,6 +37,19 @@ deepseek:
   max-tokens: 4096
   temperature: 0.7
 
+tokenhub:
+  api-key: ${TOKENHUB_API_KEY}
+  api-url: https://tokenhub.tencentmaas.com/v1/api/image/lite
+  model: hy-image-lite
+
+tencent:
+  cloud:
+    secret-id: ${TENCENT_SECRET_ID:}
+    secret-key: ${TENCENT_SECRET_KEY:}
+  cos:
+    bucket: ${COS_BUCKET:}
+    region: ${COS_REGION:ap-guangzhou}
+
 jwt:
   secret: ${JWT_SECRET:change-me-in-production-use-a-long-random-string}
   expiration: 86400000
