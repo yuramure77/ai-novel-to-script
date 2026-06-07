@@ -556,10 +556,10 @@ ai-novel-to-script/
 
 | 指标 | 数据 |
 |------|------|
-| 提交总数 | 196 commits |
-| PR 数量 | 11 个（feat 4 / fix 3 / docs 4） |
+| 提交总数 | 199 commits |
+| PR 数量 | 14 个（feat 4 / fix 2 / docs 8） |
 | 代码总行数 | 8,118 行（Java 5,475 + Vue/JS/CSS 2,643） |
-| 源文件 | 111 个（后端 62 + 前端 19 + 部署 4 + 测试 9 + 配置 17） |
+| 源文件 | 110 个（后端 62 + 前端 19 + 部署 6 + 测试 9 + 配置 14） |
 | 数据库表 | 10 张（users, projects, script_versions, folders, collaborations, generation_plan, generation_progress, image_versions, conversations, messages） |
 | API 端点 | 44 个（含 SSE 流式、邀请链接、在线检测、协作管理、生图管线） |
 | 测试覆盖 | 9 类 36 用例，JUnit 5 + Mockito，CI 集成 `mvn verify` |
