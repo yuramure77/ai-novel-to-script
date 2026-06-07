@@ -557,6 +557,9 @@ onMounted(async()=>{
     cmsgs.value=((await getHistory(pid)).data.data||[]).map(m=>({role:m.role,content:m.content}))
     // Restore saved images after YAML parsing
     restoreImages()
+    // Rebuild chapter progress from existing YAML (shows progress even before reconnecting SSE)
+    await nextTick()
+    rebuildProgressFromYaml()
     // Start presence ping
     pingPresence()
     presenceTimer = setInterval(pingPresence, 30000)
@@ -576,6 +579,15 @@ onUnmounted(()=>{
   if(presenceTimer) clearInterval(presenceTimer)
 })
 
+// Rebuild chapter progress chips from existing YAML data
+function rebuildProgressFromYaml(){
+  if(!chapters.value.length || planChapters.value.length >= chapters.value.length) return
+  const doneNums = new Set(yamlChapters.value.map(c=>c.num))
+  planChapters.value = chapters.value.map((c,i)=>({
+    num: i+1, title: c.title, status: doneNums.has(i+1) ? 'DONE' : 'PENDING', sceneCount: 0, charCount: 0
+  }))
+}
+
 // Presence ping + fetch active users
 async function pingPresence(){
   try {
@@ -590,7 +602,7 @@ async function doSplit(){splitting.value=true;try{const r=await splitChapters(pi
 
 // Generate SSE
 function doGen(){
-  gen.value=true;progressMsg.value='连接中...';planChapters.value=[]
+  gen.value=true;progressMsg.value='连接中...'
   // Keep existing yaml visible during reconnect — don't clear yaml.value
   fetch(`/api/projects/${pid}/generate/stream`,{headers:{Authorization:`Bearer ${localStorage.getItem('token')}`}})
     .then(r=>{const reader=r.body.getReader(),dec=new TextDecoder();let buf=''
