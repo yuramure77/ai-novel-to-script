@@ -14,15 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ScriptService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptService.class);
     private static final int CHUNK_SIZE = 1000; // characters per chunk
+    private static final ExecutorService sceneImgExecutor = Executors.newFixedThreadPool(4);
 
     private final ProjectService projectService;
     private final ChapterSplitService chapterSplitService;
@@ -30,19 +32,25 @@ public class ScriptService {
     private final YamlGeneratorService yamlGeneratorService;
     private final UserService userService;
     private final GenerationProgressRepository progressRepo;
+    private final CollaborationService collabService;
+    private final ImageService imageService;
 
     public ScriptService(ProjectService projectService,
                          ChapterSplitService chapterSplitService,
                          ScriptGenService scriptGenService,
                          YamlGeneratorService yamlGeneratorService,
                          UserService userService,
-                         GenerationProgressRepository progressRepo) {
+                         GenerationProgressRepository progressRepo,
+                         CollaborationService collabService,
+                         ImageService imageService) {
         this.projectService = projectService;
         this.chapterSplitService = chapterSplitService;
         this.scriptGenService = scriptGenService;
         this.yamlGeneratorService = yamlGeneratorService;
         this.userService = userService;
         this.progressRepo = progressRepo;
+        this.collabService = collabService;
+        this.imageService = imageService;
     }
 
     @Transactional
@@ -80,7 +88,8 @@ public class ScriptService {
     /**
      * Generate with SSE streaming progress + chunk checkpoint.
      * Text split into 1000-char blocks. Each block tracked via bitmap in DB.
-     * On restart, skips completed blocks and resumes from first incomplete.
+     * On restart, shows existing data immediately then resumes from first incomplete chunk.
+     * Scene images generated incrementally via background threads and pushed via SSE.
      */
     public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit, boolean resume) {
         SseEmitter emitter = new SseEmitter(7_200_000L); // 2 hour timeout
@@ -90,7 +99,8 @@ public class ScriptService {
             SecurityContextHolder.setContext(ctx);
             try {
                 Project project = projectService.getProject(projectId);
-                if (!project.getUserId().equals(userId)) {
+                // Use collaboration-aware permission check
+                if (!collabService.canEdit(projectId, userId) && !project.getUserId().equals(userId)) {
                     send(emitter, "error", "无权操作此项目");
                     emitter.complete();
                     return;
@@ -110,51 +120,64 @@ public class ScriptService {
                 projectService.updateChapterCount(projectId, total);
 
                 // --- Chunk indexing ---
-                // Map each chapter to its starting chunk index (0-based, 1000 chars per chunk)
                 String fullText = project.getOriginalText();
-                int totalChunks = (fullText.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
-                int[] chapterStartChunk = new int[total];   // first chunk index for each chapter
-                int[] chapterEndChunk = new int[total];     // last chunk index (inclusive) for each chapter
+                int totalChunks = Math.max(1, (fullText.length() + CHUNK_SIZE - 1) / CHUNK_SIZE);
+                int[] chapterStartChunk = new int[total];
+                int[] chapterEndChunk = new int[total];
                 int globalPos = 0;
                 for (int c = 0; c < total; c++) {
                     chapterStartChunk[c] = globalPos / CHUNK_SIZE;
                     int chapLen = chapters.get(c).content().length();
-                    // Find chapter position in full text to calculate accurate chunk span
                     int chapStart = fullText.indexOf(chapters.get(c).content(), globalPos);
                     if (chapStart < 0) chapStart = globalPos;
                     globalPos = chapStart + chapLen;
-                    chapterEndChunk[c] = (globalPos - 1) / CHUNK_SIZE;
+                    chapterEndChunk[c] = Math.min(totalChunks - 1, (globalPos - 1) / CHUNK_SIZE);
+                    if (chapterEndChunk[c] < chapterStartChunk[c])
+                        chapterEndChunk[c] = chapterStartChunk[c];
                 }
 
-                // --- Checkpoint lookup ---
+                // --- Checkpoint lookup with correct version handling ---
                 GenerationProgress cp = progressRepo.findByProjectId(projectId).orElse(null);
-                int nextVersion = projectService.getLatestScriptVersion(projectId) != null ?
-                    projectService.getLatestScriptVersion(projectId).getVersionNumber() + 1 : 1;
 
-                // Stale checkpoint from a previous run? Delete and start fresh
-                if (cp != null && cp.getVersionNumber() != nextVersion) {
-                    progressRepo.deleteByProjectId(projectId);
-                    cp = null;
+                // Staleness check: only delete if totalChunks changed (text was edited)
+                // or if checkpoint version doesn't match the in-progress generation.
+                // Note: saveScriptVersion auto-increments (count+1), so partial saves
+                // during generation bump the version number. We must use the checkpoint's
+                // own versionNumber to identify in-progress work.
+                if (cp != null) {
+                    if (cp.getTotalChunks() != totalChunks) {
+                        // Text was edited since last checkpoint — discard and restart
+                        log.info("Checkpoint totalChunks {} != current {}, discarding stale checkpoint",
+                            cp.getTotalChunks(), totalChunks);
+                        progressRepo.deleteByProjectId(projectId);
+                        cp = null;
+                    } else if (cp.isComplete() && cp.getPartialYaml() != null
+                            && !cp.getPartialYaml().isBlank()) {
+                        // All chunks done with valid YAML — return cached result
+                        send(emitter, "progress", Map.of("step", "done", "message",
+                            "剧本已全部生成完毕", "percent", 100));
+                        send(emitter, "done", Map.of(
+                            "yamlContent", cp.getPartialYaml(),
+                            "versionNumber", cp.getVersionNumber(),
+                            "totalChapters", total,
+                            "totalChunks", totalChunks,
+                            "fromCache", true
+                        ));
+                        projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
+                        emitter.complete();
+                        return;
+                    }
                 }
 
-                if (cp != null && cp.isComplete()) {
-                    // All chunks done — return cached result immediately
-                    send(emitter, "progress", Map.of("step", "done", "message",
-                        "剧本已全部生成完毕，无需重复生成", "percent", 100));
-                    send(emitter, "done", Map.of(
-                        "yamlContent", cp.getPartialYaml(),
-                        "versionNumber", cp.getVersionNumber(),
-                        "totalChapters", total,
-                        "fromCache", true
-                    ));
-                    projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
-                    emitter.complete();
-                    return;
-                }
-
-                // Create or reuse checkpoint
-                if (cp == null) {
-                    cp = new GenerationProgress(projectId, totalChunks, nextVersion);
+                // Determine version for this generation run
+                final int runVersion;
+                if (cp != null) {
+                    // Resume in-progress generation — keep checkpoint's version
+                    runVersion = cp.getVersionNumber();
+                } else {
+                    runVersion = projectService.getLatestScriptVersion(projectId) != null ?
+                        projectService.getLatestScriptVersion(projectId).getVersionNumber() + 1 : 1;
+                    cp = new GenerationProgress(projectId, totalChunks, runVersion);
                     cp = progressRepo.save(cp);
                 }
 
@@ -170,12 +193,31 @@ public class ScriptService {
                 }
                 resumeChapter = rc;
 
+                // --- Send existing partial YAML immediately on resume ---
+                final String oldPartialYaml = resumeChapter > 0 && cp.getPartialYaml() != null
+                    && !cp.getPartialYaml().isBlank() ? cp.getPartialYaml() : null;
+
+                if (oldPartialYaml != null) {
+                    // Show existing data right away so user sees something immediately
+                    ScriptVersion existingVersion = projectService.getLatestScriptVersion(projectId);
+                    send(emitter, "resume_data", data(
+                        "yamlContent", oldPartialYaml,
+                        "versionNumber", existingVersion != null ? existingVersion.getVersionNumber() : runVersion,
+                        "versionId", existingVersion != null ? existingVersion.getId() : 0,
+                        "resumeFrom", resumeChapter,
+                        "completedChunks", cp.completedCount(),
+                        "totalChunks", totalChunks,
+                        "totalChapters", total,
+                        "message", "已加载历史进度，续写中..."
+                    ));
+                }
+
                 // --- Resume / skip logic ---
                 List<ChapterSplitService.ChapterResult> toProcess;
                 if (resumeChapter > 0) {
                     toProcess = chapters.subList(resumeChapter, total);
                     send(emitter, "progress", data("step", "resume", "message",
-                        "块号检测: " + cp.completedCount() + "/" + totalChunks + " 已完成，"
+                        "断点续传: " + cp.completedCount() + "/" + totalChunks + " 块已完成，"
                         + "从第 " + (resumeChapter + 1) + " 章续写",
                         "resumeFrom", resumeChapter,
                         "completedChunks", cp.completedCount(),
@@ -200,9 +242,9 @@ public class ScriptService {
                 User user = userService.getById(userId);
                 final ScriptVersion[] savedVersion = {null};
                 final GenerationProgress fcp = cp;
-                // Snapshot old partial YAML for merge after resume
-                final String oldPartialYaml = resumeChapter > 0 && cp.getPartialYaml() != null
-                    && !cp.getPartialYaml().isBlank() ? cp.getPartialYaml() : null;
+                // Track which scene indices have been sent for image generation
+                final Set<Integer> imgGenDispatched = Collections.synchronizedSet(new HashSet<>());
+                final AtomicInteger sceneIdxCounter = new AtomicInteger(0);
 
                 // --- Generate ---
                 ScriptGenService.ScriptResult result = scriptGenService.generate(
@@ -215,7 +257,7 @@ public class ScriptService {
                                 "done", d, "total", t
                             ));
                         },
-                        // Chapter-done callback — update checkpoint
+                        // Chapter-done callback — update checkpoint + trigger scene images
                         (chars, scenes, d, t) -> {
                             String partialYaml = yamlGeneratorService.generate(
                                     project.getTitle(), "原著小说",
@@ -232,10 +274,48 @@ public class ScriptService {
                             // Mark this chapter's chunks as done
                             int chapIdx = resumeChapter + (d - 1);
                             if (chapIdx < total) {
-                                fcp.markRangeDone(chapterStartChunk[chapIdx], chapterEndChunk[chapIdx]);
+                                try {
+                                    fcp.markRangeDone(chapterStartChunk[chapIdx], chapterEndChunk[chapIdx]);
+                                } catch (Exception ex) {
+                                    log.warn("markRangeDone failed for chapter {}: {}", chapIdx, ex.getMessage());
+                                }
                             }
                             fcp.setPartialYaml(partialYaml);
                             progressRepo.save(fcp);
+
+                            // --- Incremental scene image generation ---
+                            // Dispatch background threads for new scenes in this chapter
+                            if (scenes != null && !scenes.isEmpty()) {
+                                for (int si = 0; si < scenes.size(); si++) {
+                                    final int sceneIdx = si;
+                                    if (!imgGenDispatched.contains(sceneIdx)) {
+                                        imgGenDispatched.add(sceneIdx);
+                                        final Map<String, Object> s = scenes.get(si);
+                                        sceneImgExecutor.submit(() -> {
+                                            try {
+                                                String desc = Objects.toString(s.get("description"), "");
+                                                String location = Objects.toString(s.get("location"), "");
+                                                String time = Objects.toString(s.get("time"), "");
+                                                String mood = Objects.toString(s.get("mood"), "");
+                                                String stitle = Objects.toString(s.get("title"),
+                                                    desc.isBlank() ? "场景" + (sceneIdx + 1) : "场景" + (sceneIdx + 1));
+
+                                                Map<String, Object> img = imageService.generateSceneImage(
+                                                    projectId, sceneIdx, desc, location, time, mood);
+                                                send(emitter, "scene_image", data(
+                                                    "index", sceneIdx,
+                                                    "url", img.get("url"),
+                                                    "prompt", img.get("prompt"),
+                                                    "title", stitle
+                                                ));
+                                                log.info("Scene image generated idx={}, title={}", sceneIdx, stitle);
+                                            } catch (Exception ex) {
+                                                log.warn("Scene image gen failed idx={}: {}", sceneIdx, ex.getMessage());
+                                            }
+                                        });
+                                    }
+                                }
+                            }
 
                             int pct = t > 0 ? (int)((double)d / t * 90) : 50;
                             int doneC = fcp.completedCount();
@@ -261,7 +341,7 @@ public class ScriptService {
                         user.getNickname() != null ? user.getNickname() : user.getUsername(),
                         result.characters(), result.scenes()) : "";
 
-                // Merge with old partial YAML if resuming — preserve previous chapters
+                // Merge with old partial YAML if resuming
                 if (oldPartialYaml != null && finalYaml != null && !finalYaml.isBlank()) {
                     finalYaml = mergeYaml(oldPartialYaml, finalYaml);
                 }
