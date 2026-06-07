@@ -68,9 +68,11 @@
       <!-- Center: YAML -->
       <div class="col cc" :class="{wide:!showR}">
         <div class="ct"><span>📄 剧本</span>
-          <div>
-            <el-button v-if="!isReadOnly" size="small" text @click="toggleEdit">{{edit?'预览':'编辑'}}</el-button>
-            <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button>
+          <div style="display:flex;gap:6px">
+            <el-button v-if="!isReadOnly" size="small" @click="toggleEdit"
+              :style="edit?'color:var(--c-gold);border-color:var(--c-gold);font-weight:600':'color:var(--color-text-muted)'"
+              :type="edit?'warning':''" :plain="!edit" text>{{edit?'👁 预览':'✏️ 编辑'}}</el-button>
+            <el-button size="small" text @click="cpyY" v-if="yaml" style="color:var(--color-text-muted)">📋 复制</el-button>
           </div>
         </div>
         <!-- YAML chapter index -->
@@ -722,10 +724,10 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ch.on{background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(212,168,83,0.3)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
 .col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.cl{width:30%;min-width:260px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
-.cc{width:45%;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.09)}
-.cc.wide{width:70%}
-.cr{width:25%;min-width:300px;background:rgba(255,255,255,0.03)}
+.cl{flex:1;min-width:260px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc{flex:1;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.09)}
+.cc.wide{flex:2}
+.cr{width:340px;min-width:300px;background:rgba(255,255,255,0.03)}
 .ct{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0;background:rgba(255,255,255,0.03);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .cb{flex:1;overflow:auto;padding:12px}
 .cb pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--color-text)}
