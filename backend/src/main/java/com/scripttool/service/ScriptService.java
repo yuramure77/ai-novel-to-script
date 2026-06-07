@@ -196,6 +196,9 @@ public class ScriptService {
                 User user = userService.getById(userId);
                 final ScriptVersion[] savedVersion = {null};
                 final GenerationProgress fcp = cp;
+                // Snapshot old partial YAML for merge after resume
+                final String oldPartialYaml = resumeChapter > 0 && cp.getPartialYaml() != null
+                    && !cp.getPartialYaml().isBlank() ? cp.getPartialYaml() : null;
 
                 // --- Generate ---
                 ScriptGenService.ScriptResult result = scriptGenService.generate(
@@ -247,6 +250,12 @@ public class ScriptService {
                     yamlGeneratorService.generate(project.getTitle(), "原著小说",
                         user.getNickname() != null ? user.getNickname() : user.getUsername(),
                         result.characters(), result.scenes()) : "";
+
+                // Merge with old partial YAML if resuming — preserve previous chapters
+                if (oldPartialYaml != null && finalYaml != null && !finalYaml.isBlank()) {
+                    finalYaml = mergeYaml(oldPartialYaml, finalYaml);
+                }
+
                 projectService.saveScriptVersion(projectId, finalYaml);
                 progressRepo.deleteByProjectId(projectId); // cleanup checkpoint
                 projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
@@ -272,6 +281,64 @@ public class ScriptService {
         }).start();
 
         return emitter;
+    }
+
+    /** Merge old partial YAML scenes into new YAML — preserves previously generated chapters */
+    private String mergeYaml(String oldYaml, String newYaml) {
+        try {
+            // Extract scenes section from both YAMLs
+            String oldScenes = extractSection(oldYaml, "scenes:");
+            String newScenes = extractSection(newYaml, "scenes:");
+            if (oldScenes.isEmpty() || newScenes.isEmpty()) return newYaml;
+
+            // Collect scene IDs from new YAML to avoid duplicates
+            java.util.Set<String> newIds = new java.util.HashSet<>();
+            var idPat = java.util.regex.Pattern.compile("^\\s*-?\\s*id:\\s*(\\S+)", java.util.regex.Pattern.MULTILINE);
+            var m = idPat.matcher(newScenes);
+            while (m.find()) newIds.add(m.group(1));
+
+            // Filter old scenes — keep only those NOT in new YAML
+            StringBuilder mergedScenes = new StringBuilder(newScenes.stripTrailing());
+            String[] oldLines = oldScenes.split("\n");
+            boolean inOldScene = false;
+            StringBuilder currentOldScene = new StringBuilder();
+            String currentOldId = null;
+            for (String line : oldLines) {
+                var idm = idPat.matcher(line);
+                if (idm.find()) {
+                    // Flush previous scene
+                    if (currentOldId != null && !newIds.contains(currentOldId) && currentOldScene.length() > 0) {
+                        mergedScenes.append("\n").append(currentOldScene.toString().stripTrailing());
+                    }
+                    currentOldScene = new StringBuilder();
+                    currentOldId = idm.group(1);
+                    inOldScene = true;
+                }
+                if (inOldScene) currentOldScene.append(line).append("\n");
+            }
+            // Flush last scene
+            if (currentOldId != null && !newIds.contains(currentOldId) && currentOldScene.length() > 0) {
+                mergedScenes.append("\n").append(currentOldScene.toString().stripTrailing());
+            }
+
+            // Replace scenes section in new YAML
+            return newYaml.replace(newScenes, mergedScenes.toString());
+        } catch (Exception e) {
+            log.warn("YAML merge failed: {}", e.getMessage());
+            return newYaml;
+        }
+    }
+
+    private String extractSection(String yaml, String header) {
+        int start = yaml.indexOf(header);
+        if (start < 0) return "";
+        int contentStart = yaml.indexOf('\n', start) + 1;
+        // Find next top-level key (unindented)
+        var nextKey = java.util.regex.Pattern.compile("^\\w", java.util.regex.Pattern.MULTILINE);
+        var m = nextKey.matcher(yaml);
+        int end = yaml.length();
+        if (m.find(contentStart)) end = m.start();
+        return yaml.substring(start, end);
     }
 
     /** Quick map builder for SSE event data — avoids Map.of's 10-arg limit */
