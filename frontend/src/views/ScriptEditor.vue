@@ -18,6 +18,7 @@
               <el-dropdown-item command="yaml">YAML</el-dropdown-item>
               <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
               <el-dropdown-item command="fountain">Fountain</el-dropdown-item>
+              <el-dropdown-item command="txt">TXT</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -725,7 +726,7 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .cc{width:45%;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.09)}
 .cc.wide{width:70%}
 .cr{width:25%;min-width:300px;background:rgba(255,255,255,0.03)}
-.ct{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0}
+.ct{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0;background:rgba(255,255,255,0.03);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .cb{flex:1;overflow:auto;padding:12px}
 .cb pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--color-text)}
 .emp{flex:1;display:flex;align-items:center;justify-content:center}
@@ -753,7 +754,14 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .yv :deep(.hljs-built_in){color:#c8b896}
 .yv :deep(.hljs-type){color:#d4a853}
 .yv :deep(.hljs-meta){color:#8b7b65}
-.rtt{height:100%;display:flex;flex-direction:column;padding:0 6px}
+.rtt{height:100%;display:flex;flex-direction:column}
+.rtt :deep(.el-tabs__header){margin:0;padding:0 8px}
+.rtt :deep(.el-tabs__nav-wrap)::after{height:1px;background:var(--color-border-light)}
+.rtt :deep(.el-tabs__nav){display:flex;justify-content:space-around}
+.rtt :deep(.el-tabs__item){flex:1;text-align:center;font-size:12px;font-weight:500;color:var(--color-text-muted);height:36px;line-height:36px;padding:0 4px;transition:all .2s}
+.rtt :deep(.el-tabs__item:hover){color:var(--c-gold)}
+.rtt :deep(.el-tabs__item.is-active){color:var(--c-gold);font-weight:700}
+.rtt :deep(.el-tabs__active-bar){background:linear-gradient(90deg,var(--c-gold),var(--c-amber));height:2px;border-radius:1px}
 .rtt :deep(.el-tabs__content){flex:1;overflow:hidden}
 .rtt :deep(.el-tab-pane){height:100%}
 

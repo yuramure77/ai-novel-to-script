@@ -1,8 +1,10 @@
 package com.scripttool.service;
 
+import com.scripttool.model.entity.GenerationProgress;
 import com.scripttool.model.entity.Project;
 import com.scripttool.model.entity.ScriptVersion;
 import com.scripttool.model.entity.User;
+import com.scripttool.repository.GenerationProgressRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContext;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,23 +22,27 @@ import java.util.Map;
 public class ScriptService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptService.class);
+    private static final int CHUNK_SIZE = 1000; // characters per chunk
 
     private final ProjectService projectService;
     private final ChapterSplitService chapterSplitService;
     private final ScriptGenService scriptGenService;
     private final YamlGeneratorService yamlGeneratorService;
     private final UserService userService;
+    private final GenerationProgressRepository progressRepo;
 
     public ScriptService(ProjectService projectService,
                          ChapterSplitService chapterSplitService,
                          ScriptGenService scriptGenService,
                          YamlGeneratorService yamlGeneratorService,
-                         UserService userService) {
+                         UserService userService,
+                         GenerationProgressRepository progressRepo) {
         this.projectService = projectService;
         this.chapterSplitService = chapterSplitService;
         this.scriptGenService = scriptGenService;
         this.yamlGeneratorService = yamlGeneratorService;
         this.userService = userService;
+        this.progressRepo = progressRepo;
     }
 
     @Transactional
@@ -71,10 +78,12 @@ public class ScriptService {
     }
 
     /**
-     * Generate with SSE streaming progress
+     * Generate with SSE streaming progress + chunk checkpoint.
+     * Text split into 1000-char blocks. Each block tracked via bitmap in DB.
+     * On restart, skips completed blocks and resumes from first incomplete.
      */
     public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit, boolean resume) {
-        SseEmitter emitter = new SseEmitter(7_200_000L); // 2 hour timeout for long novels
+        SseEmitter emitter = new SseEmitter(7_200_000L); // 2 hour timeout
         SecurityContext ctx = SecurityContextHolder.getContext();
 
         new Thread(() -> {
@@ -97,63 +106,101 @@ public class ScriptService {
                     return;
                 }
 
-                // Apply pagination: only process a range of chapters
                 int total = chapters.size();
-                int from = Math.max(0, Math.min(start, total - 1));
-                int to = limit > 0 ? Math.min(from + limit, total) : total;
-                List<ChapterSplitService.ChapterResult> page = chapters.subList(from, to);
-
                 projectService.updateChapterCount(projectId, total);
-                String pageInfo = limit > 0 ? String.format("识别到 %d 章，处理第 %d-%d 章", total, from + 1, to) :
-                        "识别到 " + total + " 个章节";
-                send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
-                        "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
-                // Auto-resume: if project was PROCESSING (interrupted) + has partial version, skip done chapters
-                int resumeFrom = 0;
-                boolean wasInterrupted = project.getStatus() == Project.ProjectStatus.PROCESSING;
-                if (resume || wasInterrupted) {
-                    var latestVersion = projectService.getLatestScriptVersion(projectId);
-                    if (latestVersion != null && latestVersion.getYamlContent() != null
-                            && !latestVersion.getYamlContent().isBlank()) {
-                        int maxChap = 0;
-                        for (String line : latestVersion.getYamlContent().split("\n")) {
-                            var m = java.util.regex.Pattern.compile("chapter:\\s*(\\d+)").matcher(line);
-                            if (m.find()) maxChap = Math.max(maxChap, Integer.parseInt(m.group(1)));
-                        }
-                        resumeFrom = Math.max(0, maxChap);
-                        if (resumeFrom > 0) {
-                            send(emitter, "progress", Map.of("step", "resume", "message",
-                                "检测到上次生成中断，从第 " + (resumeFrom + 1) + " 章继续...",
-                                "resumeFrom", resumeFrom));
-                        }
+                // --- Chunk indexing ---
+                // Map each chapter to its starting chunk index (0-based, 1000 chars per chunk)
+                String fullText = project.getOriginalText();
+                int totalChunks = (fullText.length() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+                int[] chapterStartChunk = new int[total];   // first chunk index for each chapter
+                int[] chapterEndChunk = new int[total];     // last chunk index (inclusive) for each chapter
+                int globalPos = 0;
+                for (int c = 0; c < total; c++) {
+                    chapterStartChunk[c] = globalPos / CHUNK_SIZE;
+                    int chapLen = chapters.get(c).content().length();
+                    // Find chapter position in full text to calculate accurate chunk span
+                    int chapStart = fullText.indexOf(chapters.get(c).content(), globalPos);
+                    if (chapStart < 0) chapStart = globalPos;
+                    globalPos = chapStart + chapLen;
+                    chapterEndChunk[c] = (globalPos - 1) / CHUNK_SIZE;
+                }
+
+                // --- Checkpoint lookup ---
+                GenerationProgress cp = progressRepo.findByProjectId(projectId).orElse(null);
+                int nextVersion = cp != null ? cp.getVersionNumber() : 1;
+                if (projectService.getLatestScriptVersion(projectId) != null) {
+                    nextVersion = projectService.getLatestScriptVersion(projectId).getVersionNumber() + 1;
+                }
+
+                if (cp != null && cp.isComplete()) {
+                    // All chunks done — return cached result immediately
+                    send(emitter, "progress", Map.of("step", "done", "message",
+                        "剧本已全部生成完毕，无需重复生成", "percent", 100));
+                    send(emitter, "done", Map.of(
+                        "yamlContent", cp.getPartialYaml(),
+                        "versionNumber", cp.getVersionNumber(),
+                        "totalChapters", total,
+                        "fromCache", true
+                    ));
+                    projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
+                    emitter.complete();
+                    return;
+                }
+
+                // Create or reuse checkpoint
+                if (cp == null) {
+                    cp = new GenerationProgress(projectId, totalChunks, nextVersion);
+                    cp = progressRepo.save(cp);
+                }
+
+                // Find first incomplete chunk → map to chapter index
+                int firstIncomplete = cp.firstIncompleteChunk();
+                final int resumeChapter;
+                int rc = 0;
+                for (int c = 0; c < total; c++) {
+                    if (chapterEndChunk[c] >= firstIncomplete) {
+                        rc = c;
+                        break;
                     }
                 }
+                resumeChapter = rc;
 
-                // Skip already-processed chapters when resuming
-                List<ChapterSplitService.ChapterResult> toProcess = page;
-                if (resumeFrom > 0 && resumeFrom < total) {
-                    int skip = Math.min(resumeFrom, total);
-                    toProcess = chapters.subList(skip, total);
+                // --- Resume / skip logic ---
+                List<ChapterSplitService.ChapterResult> toProcess;
+                if (resumeChapter > 0) {
+                    toProcess = chapters.subList(resumeChapter, total);
+                    send(emitter, "progress", data("step", "resume", "message",
+                        "块号检测: " + cp.completedCount() + "/" + totalChunks + " 已完成，"
+                        + "从第 " + (resumeChapter + 1) + " 章续写",
+                        "resumeFrom", resumeChapter,
+                        "completedChunks", cp.completedCount(),
+                        "totalChunks", totalChunks,
+                        "totalChapters", toProcess.size(),
+                        "fullTotal", total));
+                } else {
+                    toProcess = chapters.subList(0, total);
                     send(emitter, "progress", Map.of("step", "split", "message",
-                        "跳过前 " + skip + " 章，处理剩余 " + toProcess.size() + " 章",
-                        "totalChapters", toProcess.size(), "fullTotal", total));
+                        "识别到 " + total + " 章，" + totalChunks + " 个块，开始生成...",
+                        "totalChapters", total, "totalChunks", totalChunks));
                 }
 
-                // Count total chunks
-                int estChunks = 0;
-                for (var ch : toProcess) {
-                    estChunks += Math.max(1, (ch.content().length() + 499) / 500);
-                }
+                // Estimate remaining chunks for progress
+                int remainChunks = 0;
+                for (var ch : toProcess)
+                    remainChunks += Math.max(1, (ch.content().length() + CHUNK_SIZE - 1) / CHUNK_SIZE);
                 send(emitter, "progress", Map.of("step", "split", "message",
-                    "拆分为 " + estChunks + " 个小块，开始生成...", "percent", 0, "totalChunks", estChunks));
+                    "待处理 " + remainChunks + " 个块", "percent", 0,
+                    "totalChunks", totalChunks, "doneChunks", cp.completedCount()));
 
                 User user = userService.getById(userId);
                 final ScriptVersion[] savedVersion = {null};
+                final GenerationProgress fcp = cp;
 
+                // --- Generate ---
                 ScriptGenService.ScriptResult result = scriptGenService.generate(
                         project.getOriginalText(), toProcess,
-                        // Progress — called before each chunk
+                        // Progress callback
                         (d, t, msg) -> {
                             int pct = t > 0 ? (int)((double)d / t * 90) : 50;
                             send(emitter, "progress", Map.of(
@@ -161,15 +208,25 @@ public class ScriptService {
                                 "done", d, "total", t
                             ));
                         },
-                        // Chunk callback — called after EACH AI call with accumulated results
+                        // Chapter-done callback — update checkpoint
                         (chars, scenes, d, t) -> {
                             String partialYaml = yamlGeneratorService.generate(
                                     project.getTitle(), "原著小说",
                                     user.getNickname() != null ? user.getNickname() : user.getUsername(),
                                     chars, scenes);
                             savedVersion[0] = projectService.saveScriptVersion(projectId, partialYaml);
+
+                            // Mark this chapter's chunks as done
+                            int chapIdx = resumeChapter + (d - 1);
+                            if (chapIdx < total) {
+                                fcp.markRangeDone(chapterStartChunk[chapIdx], chapterEndChunk[chapIdx]);
+                            }
+                            fcp.setPartialYaml(partialYaml);
+                            progressRepo.save(fcp);
+
                             int pct = t > 0 ? (int)((double)d / t * 90) : 50;
-                            send(emitter, "chapter_done", Map.of(
+                            int doneC = fcp.completedCount();
+                            send(emitter, "chapter_done", data(
                                 "yamlContent", partialYaml,
                                 "versionId", savedVersion[0].getId(),
                                 "versionNumber", savedVersion[0].getVersionNumber(),
@@ -177,10 +234,13 @@ public class ScriptService {
                                 "charCount", chars.size(),
                                 "sceneCount", scenes.size(),
                                 "isLast", d >= t,
-                                "percent", pct
+                                "percent", pct,
+                                "completedChunks", doneC,
+                                "totalChunks", totalChunks
                             ));
                         });
 
+                // --- Finalize ---
                 int charCount = result.characters().size();
                 int sceneCount = result.scenes().size();
                 String finalYaml = savedVersion[0] != null ?
@@ -188,22 +248,23 @@ public class ScriptService {
                         user.getNickname() != null ? user.getNickname() : user.getUsername(),
                         result.characters(), result.scenes()) : "";
                 projectService.saveScriptVersion(projectId, finalYaml);
+                progressRepo.deleteByProjectId(projectId); // cleanup checkpoint
                 projectService.updateStatus(projectId, Project.ProjectStatus.COMPLETED);
 
-                send(emitter, "done", Map.of(
+                send(emitter, "done", data(
                         "versionId", savedVersion[0] != null ? savedVersion[0].getId() : 0,
                         "versionNumber", savedVersion[0] != null ? savedVersion[0].getVersionNumber() : 1,
                         "yamlContent", finalYaml,
                         "charCount", charCount,
                         "sceneCount", sceneCount,
-                        "totalChapters", total
+                        "totalChapters", total,
+                        "totalChunks", totalChunks
                 ));
                 emitter.complete();
 
             } catch (Exception e) {
                 log.error("Generation failed", e);
                 send(emitter, "error", e.getMessage());
-                // Keep PROCESSING status so auto-resume kicks in next time
                 emitter.complete();
             } finally {
                 SecurityContextHolder.clearContext();
@@ -211,6 +272,13 @@ public class ScriptService {
         }).start();
 
         return emitter;
+    }
+
+    /** Quick map builder for SSE event data — avoids Map.of's 10-arg limit */
+    private static Map<String, Object> data(Object... kv) {
+        Map<String, Object> m = new HashMap<>();
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
+        return m;
     }
 
     private void send(SseEmitter emitter, String event, Object data) {
