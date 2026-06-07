@@ -70,8 +70,8 @@
 - **响应式适配** — 手机端完整适配，弹窗宽度自适、表单移动端布局优化
 
 ### 🔧 DevOps
-- **GitHub Actions CI** — push 自动编译后端（Maven）+ 前端（Vite）
-- **Webhook 热部署** — GitHub push → webhook → git pull → build → restart
+- **GitHub Actions CI** — push 自动编译+测试（`mvn verify`，含 36 个测试用例）+ 前端构建（Vite）
+- **Webhook 热部署** — GitHub push → webhook → git pull → build → restart，全程自动化
 - **systemd 服务** — 崩溃自动重启，journalctl 日志
 - **Nginx + HTTPS** — Let's Encrypt 自动证书
 - **健康检查** — Spring Boot Actuator `/actuator/health`
