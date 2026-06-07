@@ -86,7 +86,7 @@ async function load() {
   try {
     const r = await api.post(`/projects/${props.projectId}/invite-link`)
     const token = r.data.data?.inviteToken
-    if (token) inviteLink.value = window.location.origin + '/#/join?token=' + token
+    if (token) inviteLink.value = window.location.origin + '/join?token=' + token
   } catch { /* owner only */ }
 }
 
@@ -97,7 +97,7 @@ async function genLink() {
     const r = inviteLink.value ? await api.post(url) : await api.post(url)
     const token = r.data.data?.inviteToken
     if (token) {
-      inviteLink.value = window.location.origin + '/#/join?token=' + token
+      inviteLink.value = window.location.origin + '/join?token=' + token
       ElMessage.success(inviteLink.value ? '链接已重新生成' : '链接已生成')
     }
   } catch (e) { ElMessage.error(e.response?.data?.message || '操作失败') }
