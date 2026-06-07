@@ -92,9 +92,22 @@ async function register() {
 .brand h1 { font-size: 26px; font-weight: 800; color: var(--c-gold); letter-spacing: 6px; margin: 0 0 6px; font-family: var(--font-serif); }
 .slogan { font-size: 14px; color: var(--c-gold-light); font-style: italic; letter-spacing: 2px; margin: 0; }
 .tabs { margin-top: 8px; }
+.tabs :deep(.el-tabs__header) { margin-bottom: 20px; }
+.tabs :deep(.el-tabs__item) {
+  font-size: 16px; font-weight: 600; color: var(--color-text-muted); transition: color var(--transition);
+}
+.tabs :deep(.el-tabs__item:hover) { color: var(--c-gold); }
+.tabs :deep(.el-tabs__item.is-active) { color: var(--c-gold); font-weight: 700; }
+.tabs :deep(.el-tabs__active-bar) { background: var(--c-gold); height: 3px; border-radius: 2px; }
+.tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background: var(--color-border); }
 .back-home { text-align: center; margin-top: 20px; }
 .back-home a { color: var(--color-text-muted); font-size: 12px; text-decoration: none; }
 .back-home a:hover { color: var(--c-gold); }
+.login-card :deep(.el-input__wrapper) {
+  background: var(--color-bg); border-color: var(--color-border); box-shadow: none;
+}
+.login-card :deep(.el-input__wrapper:hover) { border-color: var(--c-gold); }
+.login-card :deep(.el-input__wrapper.is-focus) { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) inset; }
 
 @media (max-width: 768px) {
   .login-card { width: 92%; padding: 28px 20px; margin: 16px; }
