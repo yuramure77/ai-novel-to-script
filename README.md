@@ -2,6 +2,8 @@
 
 > 基于 DeepSeek 大模型的智能小说→剧本转换工具。AI 自动分章、提取角色、生成结构化 YAML 剧本，支持多人协作、AI 生图、多格式导出。
 
+📺 **[Demo 演示视频 — Bilibili](https://www.bilibili.com/video/BV1fvEt6oEZJ/)**
+
 [![CI](https://github.com/yuramure77/ai-novel-to-script/actions/workflows/ci.yml/badge.svg)](https://github.com/yuramure77/ai-novel-to-script/actions/workflows/ci.yml)
 
 ---
