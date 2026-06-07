@@ -476,8 +476,9 @@ watch(yaml,()=>{
 watch(yaml,()=>{
   try{
     const out=[]; const txt=yaml.value
-    // Split scenes: AI format "- title:" / "- scene_id:" / demo format "  - id: SCENE_"
-    const re=/(?:^|\n)\s*- (?:id: |title: |scene_id: )/
+    // Split scenes: AI outputs "chapter:" as first field, demo uses "id:/title:/scene_id:"
+    // SnakeYAML renders the AI's JSON as: "- chapter: 1\n  scene_number: 1\n  ..."
+    const re=/(?:^|\n)\s*- (?:chapter: |id: |title: |scene_id: )/
     const matches=[...txt.matchAll(new RegExp(re,'g'))]
     for(let i=0;i<matches.length;i++){
       const start=matches[i].index+(matches[i][0].startsWith('\n')?1:0)
@@ -561,6 +562,8 @@ function doGen(){
               }
               progressMsg.value=d.message||'续写中...'
               if(d.completedChunks !== undefined) progressPct.value = Math.round(d.completedChunks / d.totalChunks * 100)
+              // Restore existing images after YAML watchers parse characters/scenes
+              nextTick(() => { restoreImages() })
             }
             else if(ev==='chapter_done'){
               if(d.yamlContent){
@@ -576,9 +579,11 @@ function doGen(){
               // Real-time scene image push from backend thread pool
               if(d.url && d.index !== undefined){
                 const idx = Number(d.index)
-                if(sceneImgs.value[idx]){
-                  sceneImgs.value[idx] = { ...sceneImgs.value[idx], image: d.url, prompt: d.prompt || '' }
+                // Create entry if not yet parsed from YAML (handles race condition)
+                if(!sceneImgs.value[idx]){
+                  sceneImgs.value[idx] = { title: d.title || ('场景'+(idx+1)), description: '', location: '', time: '', mood: '' }
                 }
+                sceneImgs.value[idx] = { ...sceneImgs.value[idx], image: d.url, prompt: d.prompt || '' }
               }
             }
             else if(ev==='done'){
