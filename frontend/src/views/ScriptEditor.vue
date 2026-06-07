@@ -56,17 +56,20 @@
     </div>
 
     <!-- Main panels -->
-    <div class="main">
+    <div class="main" ref="mainRef">
       <!-- Left: text -->
-      <div class="col cl">
+      <div class="col cl" :style="{width: leftW+'%'}">
         <div class="ct">📖 原文</div>
         <div class="cb" ref="tp">
           <pre v-html="hl(chapters.length?chapters[ac]?.content||originalText:originalText)"></pre>
         </div>
       </div>
 
+      <!-- Resize handle 1 -->
+      <div class="resize-handle" @mousedown="startResize($event, 'left')" :class="{active:resizing==='left'}"></div>
+
       <!-- Center: YAML -->
-      <div class="col cc" :class="{wide:!showR}">
+      <div class="col cc" :style="{width: centerW+'%'}">
         <div class="ct"><span>📄 剧本</span>
           <div style="display:flex;gap:6px">
             <el-button v-if="!isReadOnly" size="small" @click="toggleEdit"
@@ -90,6 +93,9 @@
         <div v-if="edit" class="eb"><el-button size="small" @click="edit=false;ey=yaml">取消</el-button>
           <el-button size="small" type="primary" :loading="saveB" @click="svY">保存 (Ctrl+S)</el-button></div>
       </div>
+
+      <!-- Resize handle 2 -->
+      <div class="resize-handle" @mousedown="startResize($event, 'center')" :class="{active:resizing==='center'}"></div>
 
       <!-- Right: Tabs -->
       <div class="col cr" v-if="showR">
@@ -362,6 +368,37 @@ function applyVersion(v) {
 // UI
 const rt = ref('chat'); const showR = ref(true); const dark = ref(false)
 const renaming = ref(false); const renameTitle = ref(''); const renameRef = ref(null)
+const mainRef = ref(null)
+
+// Resizable columns
+const leftW = ref(30); const centerW = ref(45); const resizing = ref(null)
+function startResize(e, which) {
+  resizing.value = which
+  const startX = e.clientX
+  const startLeft = leftW.value
+  const startCenter = centerW.value
+  const mainWidth = mainRef.value?.offsetWidth || 1200
+
+  function onMove(ev) {
+    const dx = ((ev.clientX - startX) / mainWidth) * 100
+    if (which === 'left') {
+      const nl = Math.max(15, Math.min(55, startLeft + dx))
+      const nc = startCenter - (nl - startLeft)
+      leftW.value = Math.round(nl)
+      centerW.value = Math.round(Math.max(20, nc))
+    } else {
+      const nc = Math.max(20, Math.min(70, startCenter + dx))
+      centerW.value = Math.round(nc)
+    }
+  }
+  function onUp() {
+    resizing.value = null
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 // Computed
 const stTag = computed(()=>projectStatus.value==='COMPLETED'?'success':projectStatus.value==='PROCESSING'?'warning':'info')
@@ -724,10 +761,14 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ch.on{background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(212,168,83,0.3)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
 .col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.cl{flex:1;min-width:260px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
-.cc{flex:1;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
-.cc.wide{flex:2}
-.cr{width:340px;min-width:300px;background:rgba(255,255,255,0.04)}
+.cl{width:30%;min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc{width:45%;min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc.wide{width:70%}
+.cr{width:25%;min-width:200px;background:rgba(255,255,255,0.04)}
+/* Resize handles */
+.resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background .2s;flex-shrink:0;position:relative;z-index:10}
+.resize-handle:hover,.resize-handle.active{background:var(--c-gold)}
+.resize-handle::after{content:'';position:absolute;inset:-4px -6px}
 .ct{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0;background:rgba(255,255,255,0.06);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .cb{flex:1;overflow:auto;padding:12px}
 .cb pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--color-text)}
