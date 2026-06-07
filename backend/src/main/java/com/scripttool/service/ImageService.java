@@ -57,7 +57,7 @@ public class ImageService {
                 location != null ? location : "古代中国",
                 time != null ? time : "黄昏",
                 mood != null && !mood.isBlank() ? mood : "戏剧性");
-        String visualDesc = enrichPrompt("场景", base);
+        String visualDesc = enrichPrompt("场景", base, "");
         String prompt = visualDesc + "，电影级构图与光影，广角镜头，丰富的环境细节，"
                 + "史诗感，古装大片风格，高质量渲染，8K超清画质";
 
@@ -75,9 +75,13 @@ public class ImageService {
      */
     public Map<String, Object> generateCharacterImage(Long projectId, int charIndex,
                                                        String name, String description, List<String> traits) {
-        // 1. Build deep character visual description via DeepSeek
+        // 1. Detect age group from all character info
+        String ageGroup = detectAge(name, description, traits);
+
+        // 2. Build character info with age anchor
         StringBuilder base = new StringBuilder();
         base.append("角色名：").append(name != null ? name : "未知角色").append("。");
+        base.append("年龄阶段：").append(ageGroup).append("。");
         if (description != null && !description.isBlank()) {
             base.append("角色描述：").append(description).append("。");
         }
@@ -85,34 +89,69 @@ public class ImageService {
             base.append("性格特征：").append(String.join("、", traits)).append("。");
         }
 
-        String visualDesc = enrichPrompt("角色", base.toString());
+        // 3. DeepSeek enrichment with age-aware system prompt
+        String visualDesc = enrichPrompt("角色", base.toString(), ageGroup);
+
+        // 4. Build final prompt with age anchor
+        String ageAnchor = ageGroup.equals("老年") ? "，老年人物，银发白发，面部皱纹，老年体态"
+                : ageGroup.equals("中年") ? "，中年人物，成熟面容"
+                : ageGroup.equals("儿童") ? "，儿童，年幼面容"
+                : "，青年人物";
+
         String prompt = visualDesc + "，古风人物写真，中国古代服饰，精致发冠与头饰，"
                 + "电影人像摄影，柔和自然侧光，半身肖像构图，浅景深背景虚化，"
-                + "精致五官细节，皮肤质感真实，古装剧定妆照风格，高品质，8K超清";
+                + "精致五官细节，皮肤质感真实" + ageAnchor + "，古装剧定妆照风格，高品质，8K超清";
 
-        // 2. Generate image
+        // 5. Generate image
         String url = generateWithTokenHub(prompt);
 
-        // 3. Save version
+        // 6. Save version
         versionRepo.save(new ImageVersion(projectId, ImageType.CHARACTER, charIndex, url, prompt));
 
         return Map.of("url", url, "prompt", prompt);
+    }
+
+    /** Detect age group from character info keywords */
+    private String detectAge(String name, String description, List<String> traits) {
+        StringBuilder combined = new StringBuilder();
+        if (name != null) combined.append(name);
+        if (description != null) combined.append(description);
+        if (traits != null) traits.forEach(combined::append);
+
+        String text = combined.toString();
+        if (text.matches(".*(老|年迈|祖母|祖父|奶奶|爷爷|长老|老妇|老夫|白发|苍老|老年|老朽|老太|姥|曾祖|高龄|古稀|花甲|耄耋).*"))
+            return "老年";
+        if (text.matches(".*(中年|壮年|妇|婶|叔|伯|姨|舅|爹|娘|父|母|师|掌柜|员外|夫人).*"))
+            return "中年";
+        if (text.matches(".*(童|孩|幼|少|小).*"))
+            return "儿童";
+        return "青年";
     }
 
     /**
      * Use DeepSeek to generate a visually-rich Chinese description for AI image generation.
      * Falls back to the original base text if DeepSeek call fails.
      */
-    private String enrichPrompt(String type, String baseInfo) {
+    private String enrichPrompt(String type, String baseInfo, String ageGroup) {
         try {
-            String systemPrompt = type.equals("角色")
-                ? "你是一位古装影视剧造型师。请根据角色信息，用高度个性化的中文描述其外貌（80字以内）。"
+            String systemPrompt;
+            if (type.equals("角色")) {
+                String ageRule = (ageGroup == null || ageGroup.isEmpty())
+                    ? "" : "严格按年龄阶段描写：" + ageGroup + "人物——"
+                      + ("老年".equals(ageGroup) ? "须有银发/白发、面部皱纹、老年体态，切忌年轻化。"
+                         : "中年".equals(ageGroup) ? "须有成熟面容、岁月痕迹，切忌年轻化。"
+                         : "儿童".equals(ageGroup) ? "须有年幼面容、童真神态。"
+                         : "须有青春气息。");
+                systemPrompt = "你是一位古装影视剧造型师。请根据角色信息，用高度个性化的中文描述其外貌（80字以内）。"
                   + "必须包含：脸型、眉形眼型、发型头饰、服饰风格、体型姿态、标志性特征。"
+                  + ageRule
                   + "关键：突出该角色区别于其他人物的独特外貌，避免千篇一律的「剑眉星目」「面如冠玉」。"
                   + "性格特质要转化为视觉元素——如「孤傲」→下颌微扬冷峻神情，「温柔」→眼含笑意体态柔和。"
-                  + "参考三岛由纪夫《春雪》中松枝清显「纤细优美近乎病态」与本多繁邦「方正刚毅」的对比写法。"
-                : "你是一位古装影视剧美术指导。请根据场景信息，用高度个性化的中文描述环境画面（80字以内）。"
+                  + "参考三岛由纪夫《春雪》中松枝清显「纤细近乎病态」与本多繁邦「方正刚毅」的对比写法。";
+            } else {
+                systemPrompt = "你是一位古装影视剧美术指导。请根据场景信息，用高度个性化的中文描述环境画面（80字以内）。"
                   + "必须包含：独特的环境氛围、有辨识度的光影色调、建筑或自然景观的鲜明特征。避免套路化描写。";
+            }
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", deepSeekConfig.getModel());
