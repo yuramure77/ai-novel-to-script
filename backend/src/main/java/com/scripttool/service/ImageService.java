@@ -37,24 +37,56 @@ public class ImageService {
     }
 
     public String generateSceneImage(String desc, String location, String time, String mood) {
-        String prompt = String.format(
-            "电影级场景, %s, 地点: %s, 时间: %s, 氛围: %s, 中国风, 高质量, cinematic lighting, highly detailed",
-            desc != null ? desc : "戏剧场景",
-            location != null ? location : "古代中国",
-            time != null ? time : "黄昏",
-            mood != null ? mood : "戏剧性"
-        );
-        return generateWithTokenHub(prompt, "scene");
+        // Build rich cinematic scene prompt
+        StringBuilder sb = new StringBuilder();
+        sb.append("电影级场景，");
+
+        if (desc != null && !desc.isBlank()) {
+            sb.append(desc).append("，");
+        }
+
+        sb.append("地点：").append(location != null ? location : "古代中国").append("，");
+        sb.append("时辰：").append(time != null ? time : "黄昏").append("，");
+
+        if (mood != null && !mood.isBlank()) {
+            sb.append("氛围：").append(mood).append("，");
+        }
+
+        sb.append("中国古代美学，电影构图与光影，广角镜头，");
+        sb.append("丰富的环境细节，史诗感，古装大片风格，高质量渲染，8K超清画质");
+
+        return generateWithTokenHub(sb.toString(), "scene");
     }
 
     public String generateCharacterImage(String name, String description, List<String> traits) {
-        String prompt = String.format(
-            "角色肖像, %s, %s, 特征: %s, 电影灯光, 专业摄影, 高质量, professional portrait photography",
-            name != null ? name : "角色",
-            description != null ? description : "历史人物",
-            traits != null ? String.join(", ", traits) : "神秘"
-        );
-        return generateWithTokenHub(prompt, "character");
+        // Build high-quality character portrait prompt
+        StringBuilder sb = new StringBuilder();
+        sb.append("古风人物写真，");
+
+        // Character identity
+        if (name != null && !name.isBlank()) {
+            sb.append("角色「").append(name).append("」");
+        }
+
+        // Visual description from AI analysis
+        if (description != null && !description.isBlank()) {
+            sb.append("，").append(description);
+        } else {
+            sb.append("，中国古代人物");
+        }
+
+        // Personality traits → visual atmosphere
+        if (traits != null && !traits.isEmpty()) {
+            sb.append("，性格气质：").append(String.join("、", traits));
+        }
+
+        // Artistic direction — Chinese historical drama portrait style
+        sb.append("，中国古代服饰，精致发冠与头饰，电影人像摄影，");
+        sb.append("柔和自然侧光，半身肖像构图，浅景深背景虚化，");
+        sb.append("精致五官细节，皮肤质感真实，古装剧定妆照风格，");
+        sb.append("高品质，8K超清");
+
+        return generateWithTokenHub(sb.toString(), "character");
     }
 
     /**
