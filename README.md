@@ -584,8 +584,8 @@ ai-novel-to-script/
 
 | 指标 | 数据 |
 |------|------|
-| 提交总数 | 199 commits |
-| PR 数量 | 14 个（feat 4 / fix 2 / docs 8） |
+| 提交总数 | 211 commits |
+| PR 数量 | 26 个（feat 5 / fix 7 / docs 13 / chore 1） |
 | 代码总行数 | 8,118 行（Java 5,475 + Vue/JS/CSS 2,643） |
 | 源文件 | 110 个（后端 62 + 前端 19 + 部署 6 + 测试 9 + 配置 14） |
 | 数据库表 | 10 张（users, projects, script_versions, folders, collaborations, generation_plan, generation_progress, image_versions, conversations, messages） |
