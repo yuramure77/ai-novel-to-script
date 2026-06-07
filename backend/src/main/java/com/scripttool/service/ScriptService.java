@@ -74,7 +74,7 @@ public class ScriptService {
      * Generate with SSE streaming progress
      */
     public SseEmitter generateScriptStream(Long projectId, Long userId, int start, int limit, boolean resume) {
-        SseEmitter emitter = new SseEmitter(1_800_000L); // 10 min timeout for long novels
+        SseEmitter emitter = new SseEmitter(7_200_000L); // 2 hour timeout for long novels
         SecurityContext ctx = SecurityContextHolder.getContext();
 
         new Thread(() -> {
@@ -109,20 +109,24 @@ public class ScriptService {
                 send(emitter, "progress", Map.of("step", "split", "message", pageInfo,
                         "totalChapters", page.size(), "fullTotal", total, "pageStart", from, "pageEnd", to));
 
-                // Resume: if continuing from interrupted generation, skip processed chapters
+                // Auto-resume: if project was PROCESSING (interrupted) + has partial version, skip done chapters
                 int resumeFrom = 0;
-                if (resume) {
+                boolean wasInterrupted = project.getStatus() == Project.ProjectStatus.PROCESSING;
+                if (resume || wasInterrupted) {
                     var latestVersion = projectService.getLatestScriptVersion(projectId);
-                    if (latestVersion != null && latestVersion.getYamlContent() != null) {
-                        // Count chapters already in the partial YAML
+                    if (latestVersion != null && latestVersion.getYamlContent() != null
+                            && !latestVersion.getYamlContent().isBlank()) {
                         int maxChap = 0;
                         for (String line : latestVersion.getYamlContent().split("\n")) {
                             var m = java.util.regex.Pattern.compile("chapter:\\s*(\\d+)").matcher(line);
                             if (m.find()) maxChap = Math.max(maxChap, Integer.parseInt(m.group(1)));
                         }
                         resumeFrom = Math.max(0, maxChap);
-                        send(emitter, "progress", Map.of("step", "resume", "message",
-                            "恢复生成，从第 " + (resumeFrom + 1) + " 章继续...", "resumeFrom", resumeFrom));
+                        if (resumeFrom > 0) {
+                            send(emitter, "progress", Map.of("step", "resume", "message",
+                                "检测到上次生成中断，从第 " + (resumeFrom + 1) + " 章继续...",
+                                "resumeFrom", resumeFrom));
+                        }
                     }
                 }
 
@@ -199,7 +203,7 @@ public class ScriptService {
             } catch (Exception e) {
                 log.error("Generation failed", e);
                 send(emitter, "error", e.getMessage());
-                projectService.updateStatus(projectId, Project.ProjectStatus.DRAFT);
+                // Keep PROCESSING status so auto-resume kicks in next time
                 emitter.complete();
             } finally {
                 SecurityContextHolder.clearContext();
