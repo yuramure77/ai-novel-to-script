@@ -7,6 +7,7 @@
         <h2 v-if="!renaming" @dblclick="startRename" title="双击重命名">{{ projectTitle }}</h2>
         <el-input v-else v-model="renameTitle" size="small" style="width:240px" @blur="doRename" @keyup.enter="doRename" ref="renameRef" />
         <el-tag :type="stTag" size="small" round>{{ stText }}</el-tag>
+        <el-tag v-if="isReadOnly" type="info" size="small" round>👁 只读</el-tag>
       </div>
       <div class="tbr">
         <el-switch v-model="dark" inline-prompt active-text="🌙" inactive-text="☀️" @change="tDark" size="small" />
@@ -35,13 +36,14 @@
     <!-- Actions -->
     <div class="act">
       <div class="actl">
-        <el-button size="small" @click="doSplit" :loading="splitting">分章</el-button>
+        <el-button size="small" @click="doSplit" :loading="splitting" :disabled="isReadOnly">分章</el-button>
         <span v-if="chapters.length" class="hint">{{ chapters.length }} 章</span>
-        <span class="hint" style="color:var(--color-text-muted);margin-left:8px">Ctrl+F 搜索 · Ctrl+Enter 生成 · Ctrl+S 保存</span>
+        <span v-if="!isReadOnly" class="hint" style="color:var(--color-text-muted);margin-left:8px">Ctrl+F 搜索 · Ctrl+Enter 生成 · Ctrl+S 保存</span>
       </div>
-      <el-button type="primary" @click="doGen()" :loading="gen" :disabled="gen">
+      <el-button v-if="!isReadOnly" type="primary" @click="doGen()" :loading="gen" :disabled="gen">
         {{ gen ? progressMsg : '生成剧本' }}
       </el-button>
+      <el-tag v-else type="info" size="small">只读模式 — 仅可查看</el-tag>
     </div>
 
     <!-- Progress -->
@@ -65,8 +67,10 @@
       <!-- Center: YAML -->
       <div class="col cc" :class="{wide:!showR}">
         <div class="ct"><span>📄 剧本</span>
-          <div><el-button size="small" text @click="toggleEdit">{{edit?'预览':'编辑'}}</el-button>
-            <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button></div>
+          <div>
+            <el-button v-if="!isReadOnly" size="small" text @click="toggleEdit">{{edit?'预览':'编辑'}}</el-button>
+            <el-button size="small" text @click="cpyY" v-if="yaml">复制</el-button>
+          </div>
         </div>
         <!-- YAML chapter index -->
         <div v-if="yamlChapters.length && !edit" class="yaml-chaps">
@@ -76,7 +80,7 @@
           </button>
         </div>
         <div class="cb">
-          <div v-if="!yaml&&!gen" class="emp"><el-empty description="点击「生成剧本」开始"/></div>
+          <div v-if="!yaml&&!gen" class="emp"><el-empty :description="isReadOnly?'暂无剧本内容':'点击「生成剧本」开始'"/></div>
           <textarea v-else-if="edit" v-model="ey" class="ye" spellcheck="false"></textarea>
           <div v-else class="yv" :key="yaml" style="animation: revealYaml 0.4s ease-out"><pre v-html="hyFiltered"></pre></div>
         </div>
@@ -231,6 +235,7 @@ const route = useRoute(); const pid = route.params.id
 // Core state
 const projectTitle = ref(''); const projectStatus = ref('DRAFT')
 const originalText = ref(''); const chapters = ref([])
+const permission = ref('ADMIN')  // current user's permission for this project
 const ac = ref(0); const splitting = ref(false)
 const gen = ref(false); const progressMsg = ref(''); const progressPct = ref(0)
 const totalChapters = ref(0)
@@ -261,6 +266,8 @@ const renaming = ref(false); const renameTitle = ref(''); const renameRef = ref(
 // Computed
 const stTag = computed(()=>projectStatus.value==='COMPLETED'?'success':projectStatus.value==='PROCESSING'?'warning':'info')
 const stText = computed(()=>({DRAFT:'草稿',PROCESSING:'处理中',COMPLETED:'已完成'})[projectStatus.value]||'')
+const isReadOnly = computed(() => permission.value === 'READ')
+const isOwner = computed(() => permission.value === 'ADMIN')
 const hy = computed(()=>yaml.value?hljs.highlight(yaml.value,{language:'yaml'}).value:'')
 const hyFiltered = computed(()=>{
   if(!yaml.value||yamlChap.value===0)return hy.value
@@ -346,6 +353,7 @@ onMounted(async()=>{
   try{
     const r = await getProject(pid); const d = r.data.data
     projectTitle.value=d.project?.title||'';projectStatus.value=d.project?.status||'DRAFT';originalText.value=d.originalText||''
+    permission.value = d.permission || d.project?.permission || 'ADMIN'
     const v=await getLatest(pid)
     if(v.data.data){latestVersion.value=v.data.data;yaml.value=v.data.data.yamlContent}
     if(originalText.value&&!chapters.value.length)await doSplit()
@@ -543,7 +551,7 @@ function expCmd(cmd){
 }
 
 // Rename
-function startRename(){renaming.value=true;renameTitle.value=projectTitle.value;nextTick(()=>renameRef.value?.focus())}
+function startRename(){if(isReadOnly.value)return;renaming.value=true;renameTitle.value=projectTitle.value;nextTick(()=>renameRef.value?.focus())}
 async function doRename(){
   if(!renameTitle.value.trim()){renaming.value=false;return}
   try{const r=await api.put(`/projects/${pid}/rename`,{title:renameTitle.value});projectTitle.value=r.data.data.title;ElMessage.success('已重命名')}catch{ElMessage.error('失败')}
@@ -558,8 +566,8 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 // Keys
 function onKeydown(e){
   if((e.ctrlKey||e.metaKey)&&e.key==='f'){e.preventDefault();searchOn.value=!searchOn.value;if(searchOn.value)nextTick(()=>sr.value?.focus())}
-  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!gen.value){e.preventDefault();doGen()}
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'&&edit.value){e.preventDefault();svY()}
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!gen.value&&!isReadOnly.value){e.preventDefault();doGen()}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'&&edit.value&&!isReadOnly.value){e.preventDefault();svY()}
   if(e.key==='Escape'&&searchOn.value)searchOn.value=false
 }
 

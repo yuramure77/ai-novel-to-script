@@ -79,6 +79,9 @@
             <div class="card-inner">
               <div class="card-head">
                 <h3>{{ p.title }}</h3>
+                <el-tag v-if="!p.isOwner" size="small" round :type="p.permission==='ADMIN'?'warning':'info'">
+                  {{ p.permission==='ADMIN'?'🔧 协管':'👁 只读' }}
+                </el-tag>
               </div>
               <div class="card-info">
                 <span>
@@ -95,9 +98,10 @@
                 <el-button size="small" round>⋯</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="(fid) => moveP(p.id, null)">📁 取消分类</el-dropdown-item>
+                    <el-dropdown-item v-if="p.isOwner" @click="openShare(p.id)">👥 协作管理</el-dropdown-item>
+                    <el-dropdown-item @click="moveP(p.id, null)">📁 取消分类</el-dropdown-item>
                     <el-dropdown-item v-for="f in folders" :key="f.id" @click="moveP(p.id, f.id)">📁 移至 {{ f.name }}</el-dropdown-item>
-                    <el-dropdown-item divided @click="del(p.id)" style="color:var(--color-danger)">🗑 删除</el-dropdown-item>
+                    <el-dropdown-item v-if="p.isOwner" divided @click="del(p.id)" style="color:var(--color-danger)">🗑 删除</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -138,6 +142,9 @@
       <el-input v-model="renameFolderName" placeholder="新名称" @keyup.enter="doRenameF" />
       <template #footer><el-button @click="showRename=false">取消</el-button><el-button type="primary" @click="doRenameF">确定</el-button></template>
     </el-dialog>
+
+    <!-- Share dialog -->
+    <ShareDialog v-model="showShare" :projectId="shareProjectId" />
   </div>
 </template>
 
@@ -148,6 +155,7 @@ import { ElMessage } from 'element-plus'
 import { listProjects, createProject, deleteProject } from '@/api/projects'
 import { uploadFile } from '@/api/files'
 import { listFolders, createFolder, renameFolder, deleteFolder, moveProject } from '@/api/folders'
+import ShareDialog from '@/components/ShareDialog.vue'
 
 const router = useRouter()
 const projects = ref([]); const loading = ref(false)
@@ -224,6 +232,11 @@ async function delF(id) { try { await deleteFolder(id); ElMessage.success('已�
 async function moveP(projectId, folderId) {
   try { await moveProject(projectId, folderId); load() } catch { ElMessage.error('移动失败') }
 }
+
+// Share
+const showShare = ref(false)
+const shareProjectId = ref(null)
+function openShare(projectId) { shareProjectId.value = projectId; showShare.value = true }
 
 // Misc
 function tDark(v) { document.documentElement.classList.toggle('light', v); localStorage.setItem('light', v ? '1' : '0') }
