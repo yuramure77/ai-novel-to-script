@@ -482,6 +482,12 @@ watch(yaml,()=>{
       const t=l.match(/^\s*-\s*"?([^"\n]+)/);if(t&&!l.includes('name:')&&!l.includes('role:')&&!l.includes('description:')&&!l.includes('id:')){cur.traits??=[];cur.traits.push(t[1].replace(/^"|"$/g,'').trim())}
     }
     if(cur)out.push(cur)
+    // Preserve existing images from previous parse
+    const oldChars = chars.value
+    for(let i=0;i<out.length;i++){
+      const old = oldChars.find(c=>c.name===out[i].name)
+      if(old?.image){ out[i].image = old.image; out[i].prompt = old.prompt }
+    }
     chars.value=out.filter(c=>c.name)
   }catch(e){console.warn('char parse:',e)}
 })
@@ -516,6 +522,14 @@ watch(yaml,()=>{
         mood: mood?.[1] || '',
         action: action?.[1] || ''
       })
+    }
+    // Preserve existing images from previous parse — prevents flash/disappear
+    const oldImgs = sceneImgs.value
+    for(let i=0;i<out.length;i++){
+      if(i < oldImgs.length && oldImgs[i]?.image){
+        out[i].image = oldImgs[i].image
+        out[i].prompt = oldImgs[i].prompt
+      }
     }
     sceneImgs.value = out
   }catch{}
