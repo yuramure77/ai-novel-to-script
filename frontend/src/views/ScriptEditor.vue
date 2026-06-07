@@ -518,7 +518,8 @@ onMounted(async()=>{
     if(v.data.data){latestVersion.value=v.data.data;yaml.value=v.data.data.yamlContent}
     if(originalText.value&&!chapters.value.length)await doSplit()
     cmsgs.value=((await getHistory(pid)).data.data||[]).map(m=>({role:m.role,content:m.content}))
-    // Restore saved images after YAML parsing
+    // Restore saved images after YAML parsing (wait for watch to parse scenes)
+    await nextTick()
     await nextTick()
     restoreImages()
   }catch{}

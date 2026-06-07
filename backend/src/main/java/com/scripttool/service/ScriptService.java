@@ -217,6 +217,12 @@ public class ScriptService {
                                     project.getTitle(), "原著小说",
                                     user.getNickname() != null ? user.getNickname() : user.getUsername(),
                                     chars, scenes);
+
+                            // Merge with old partial YAML when resuming
+                            if (oldPartialYaml != null && !oldPartialYaml.isBlank()) {
+                                partialYaml = mergeYaml(oldPartialYaml, partialYaml);
+                            }
+
                             savedVersion[0] = projectService.saveScriptVersion(projectId, partialYaml);
 
                             // Mark this chapter's chunks as done

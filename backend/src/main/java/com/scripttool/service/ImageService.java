@@ -57,7 +57,7 @@ public class ImageService {
                 location != null ? location : "古代中国",
                 time != null ? time : "黄昏",
                 mood != null && !mood.isBlank() ? mood : "戏剧性");
-        String visualDesc = enrichPrompt("场景", base, "");
+        String visualDesc = enrichPrompt("场景", base, "", "");
         String prompt = visualDesc + "，电影级构图与光影，广角镜头，丰富的环境细节，"
                 + "史诗感，古装大片风格，高质量渲染，8K超清画质";
 
@@ -75,12 +75,14 @@ public class ImageService {
      */
     public Map<String, Object> generateCharacterImage(Long projectId, int charIndex,
                                                        String name, String description, List<String> traits) {
-        // 1. Detect age group from all character info
+        // 1. Detect age + gender from character info
         String ageGroup = detectAge(name, description, traits);
+        String gender = detectGender(name, description, traits);
 
-        // 2. Build character info with age anchor
+        // 2. Build character info with age + gender anchors
         StringBuilder base = new StringBuilder();
         base.append("角色名：").append(name != null ? name : "未知角色").append("。");
+        base.append("性别：").append(gender).append("。");
         base.append("年龄阶段：").append(ageGroup).append("。");
         if (description != null && !description.isBlank()) {
             base.append("角色描述：").append(description).append("。");
@@ -89,18 +91,19 @@ public class ImageService {
             base.append("性格特征：").append(String.join("、", traits)).append("。");
         }
 
-        // 3. DeepSeek enrichment with age-aware system prompt
-        String visualDesc = enrichPrompt("角色", base.toString(), ageGroup);
+        // 3. DeepSeek enrichment
+        String visualDesc = enrichPrompt("角色", base.toString(), ageGroup, gender);
 
-        // 4. Build final prompt with age anchor
+        // 4. Build final prompt with age + gender anchors
         String ageAnchor = ageGroup.equals("老年") ? "，老年人物，银发白发，面部皱纹，老年体态"
                 : ageGroup.equals("中年") ? "，中年人物，成熟面容"
                 : ageGroup.equals("儿童") ? "，儿童，年幼面容"
                 : "，青年人物";
+        String genderAnchor = gender.equals("女") ? "，女性人物" : "，男性人物";
 
         String prompt = visualDesc + "，古风人物写真，中国古代服饰，精致发冠与头饰，"
                 + "电影人像摄影，柔和自然侧光，半身肖像构图，浅景深背景虚化，"
-                + "精致五官细节，皮肤质感真实" + ageAnchor + "，古装剧定妆照风格，高品质，8K超清";
+                + "精致五官细节，皮肤质感真实" + ageAnchor + genderAnchor + "，古装剧定妆照风格，高品质，8K超清";
 
         // 5. Generate image
         String url = generateWithTokenHub(prompt);
@@ -128,14 +131,31 @@ public class ImageService {
         return "青年";
     }
 
+    /** Detect gender from character info keywords */
+    private String detectGender(String name, String description, List<String> traits) {
+        StringBuilder combined = new StringBuilder();
+        if (name != null) combined.append(name);
+        if (description != null) combined.append(description);
+        if (traits != null) traits.forEach(combined::append);
+        String text = combined.toString();
+
+        if (text.matches(".*(公主|小姐|夫人|太太|姐姐|妹妹|姑|姨|母后|王妃|皇后|妃|娘|姬|妾|婢|女侠|郡主|千金|少女|女|她).*"))
+            return "女";
+        if (text.matches(".*(殿下|王子|王爷|公子|少爷|先生|兄|弟|伯|叔|父皇|帝王|皇帝|皇|郎|爷|男|他|太子|君主|侯|将).*"))
+            return "男";
+        return "男"; // default male for historical drama
+    }
+
     /**
      * Use DeepSeek to generate a visually-rich Chinese description for AI image generation.
      * Falls back to the original base text if DeepSeek call fails.
      */
-    private String enrichPrompt(String type, String baseInfo, String ageGroup) {
+    private String enrichPrompt(String type, String baseInfo, String ageGroup, String gender) {
         try {
             String systemPrompt;
             if (type.equals("角色")) {
+                String genderRule = (gender == null || gender.isEmpty()) ? ""
+                    : "该角色性别为" + gender + "，必须严格按此性别描写外貌特征。";
                 String ageRule = (ageGroup == null || ageGroup.isEmpty())
                     ? "" : "严格按年龄阶段描写：" + ageGroup + "人物——"
                       + ("老年".equals(ageGroup) ? "须有银发/白发、面部皱纹、老年体态，切忌年轻化。"
@@ -144,6 +164,7 @@ public class ImageService {
                          : "须有青春气息。");
                 systemPrompt = "你是一位古装影视剧造型师。请根据角色信息，用高度个性化的中文描述其外貌（80字以内）。"
                   + "必须包含：脸型、眉形眼型、发型头饰、服饰风格、体型姿态、标志性特征。"
+                  + genderRule
                   + ageRule
                   + "关键：突出该角色区别于其他人物的独特外貌，避免千篇一律的「剑眉星目」「面如冠玉」。"
                   + "性格特质要转化为视觉元素——如「孤傲」→下颌微扬冷峻神情，「温柔」→眼含笑意体态柔和。"
