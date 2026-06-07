@@ -757,8 +757,8 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .rtt{height:100%;display:flex;flex-direction:column}
 .rtt :deep(.el-tabs__header){margin:0;padding:0 8px}
 .rtt :deep(.el-tabs__nav-wrap)::after{height:1px;background:var(--color-border-light)}
-.rtt :deep(.el-tabs__nav){display:flex;justify-content:space-around}
-.rtt :deep(.el-tabs__item){flex:1;text-align:center;font-size:12px;font-weight:500;color:var(--color-text-muted);height:36px;line-height:36px;padding:0 4px;transition:all .2s}
+.rtt :deep(.el-tabs__nav){display:flex;justify-content:space-evenly;width:100%}
+.rtt :deep(.el-tabs__item){flex:1;text-align:center;font-size:12px;font-weight:500;color:var(--color-text-muted);height:40px;line-height:40px;padding:0 12px;transition:all .2s;letter-spacing:1px}
 .rtt :deep(.el-tabs__item:hover){color:var(--c-gold)}
 .rtt :deep(.el-tabs__item.is-active){color:var(--c-gold);font-weight:700}
 .rtt :deep(.el-tabs__active-bar){background:linear-gradient(90deg,var(--c-gold),var(--c-amber));height:2px;border-radius:1px}
