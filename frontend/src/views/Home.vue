@@ -14,8 +14,8 @@
         <h1 class="title">剧本工坊</h1>
         <p class="slogan">从文字到银幕，只差一个回车</p>
         <p class="hero-desc">
-          将小说章节智能转换为结构化剧本<br/>
-          角色提取 · 场景构建 · 对白优化 · AI 辅助打磨
+          粘贴小说 → AI 自动分章提取角色 → 实时生成结构化剧本<br/>
+          混元 AI 生成角色形象与场景图 · 邀请链接多人协作
         </p>
         <div class="hero-actions">
           <button class="btn-primary" @click="startCreating">
@@ -33,44 +33,57 @@
         </div>
         <p class="format-hint">支持 TXT / EPUB / DOCX 文件上传或直接粘贴原文</p>
         <div class="hero-stats">
-          <div class="stat"><strong>AI</strong><span>智能生成</span></div>
-          <div class="stat"><strong>∞</strong><span>多轮打磨</span></div>
-          <div class="stat"><strong>实时</strong><span>流式进度</span></div>
-          <div class="stat"><strong>YAML</strong><span>结构化输出</span></div>
+          <div class="stat"><strong>7级</strong><span>智能分章</span></div>
+          <div class="stat"><strong>SSE</strong><span>流式生成</span></div>
+          <div class="stat"><strong>断点</strong><span>任务续传</span></div>
+          <div class="stat"><strong>4格式</strong><span>多端导出</span></div>
         </div>
       </div>
     </section>
 
-    <!-- Features -->
+    <!-- Feature Grid -->
     <section class="features">
-      <h2>创作流程</h2>
-      <div class="feature-strip">
-        <div class="feat">
-          <div class="feat-num">01</div>
+      <h2>核心功能</h2>
+      <div class="feature-grid">
+        <div class="feat-card">
           <div class="feat-icon">📖</div>
-          <h3>导入小说</h3>
-          <p>粘贴文本或上传文件<br/>支持 TXT / EPUB / DOCX</p>
+          <h3>7 级智能分章</h3>
+          <p>中文·英文·罗马数字·日文·编号·分隔线·段落智能回退，覆盖中日英小说格式</p>
         </div>
-        <div class="feat-arrow">→</div>
-        <div class="feat">
-          <div class="feat-num">02</div>
+        <div class="feat-card">
           <div class="feat-icon">🤖</div>
-          <h3>AI 分析</h3>
-          <p>自动分章、提取角色<br/>识别场景与对白</p>
+          <h3>AI 剧本生成</h3>
+          <p>DeepSeek 大模型逐章分析，自动提取角色性格、场景 Beats、对白与动作指导</p>
         </div>
-        <div class="feat-arrow">→</div>
-        <div class="feat">
-          <div class="feat-num">03</div>
-          <div class="feat-icon">🎬</div>
-          <h3>生成剧本</h3>
-          <p>结构化 YAML 输出<br/>实时流式进度反馈</p>
+        <div class="feat-card">
+          <div class="feat-icon">⚡</div>
+          <h3>断点续传</h3>
+          <p>GenerationPlan 任务制持久化，中断后自动从断点续写，已完成章节秒级恢复</p>
         </div>
-        <div class="feat-arrow">→</div>
-        <div class="feat">
-          <div class="feat-num">04</div>
-          <div class="feat-icon">✨</div>
-          <h3>打磨导出</h3>
-          <p>AI 助手逐句润色<br/>多格式导出分享</p>
+        <div class="feat-card">
+          <div class="feat-icon">🖼️</div>
+          <h3>AI 角色生图</h3>
+          <p>DeepSeek 造型师 + 混元 hy-image-lite，年龄性别智能识别，反同质化提示词</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">🎥</div>
+          <h3>场景图渐进生成</h3>
+          <p>剧本生成同时后台生成场景图，SSE 实时推送，完成即出现在画廊</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">👥</div>
+          <h3>多人协作</h3>
+          <p>邀请链接一键分享，管理员/只读权限，在线用户实时感知，三层安全防护</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📄</div>
+          <h3>多格式导出</h3>
+          <p>YAML 结构化 · Markdown 阅读 · Fountain 剧本 · TXT 纯文本，一键下载</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">🎨</div>
+          <h3>沉浸式体验</h3>
+          <p>暗色/亮色双主题 · 毛玻璃弹窗 · 可拖拽面板 · 全局快捷键 · 图片版本回滚</p>
         </div>
       </div>
     </section>
@@ -214,34 +227,28 @@ async function tryDemo() {
 
 /* Features */
 .features {
-  padding: 80px 40px 60px; text-align: center; position: relative; z-index: 1;
+  padding: 80px 40px 80px; text-align: center; position: relative; z-index: 1;
 }
 .features h2 {
   font-size: 28px; color: var(--c-gold); margin-bottom: 48px;
   letter-spacing: 4px; font-family: var(--font-serif);
 }
-.feature-strip {
-  display: flex; align-items: flex-start; justify-content: center;
-  gap: 8px; max-width: 1000px; margin: 0 auto;
+.feature-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px; max-width: 1100px; margin: 0 auto;
 }
-.feat {
+.feat-card {
   background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg); padding: 28px 20px;
-  width: 180px; position: relative; transition: all var(--transition);
+  border-radius: var(--radius-lg); padding: 32px 24px;
+  text-align: left; transition: all var(--transition);
 }
-.feat:hover { transform: translateY(-4px); box-shadow: var(--shadow-gold); border-color: var(--c-gold); }
-.feat-num {
-  position: absolute; top: -12px; left: 16px;
-  font-size: 11px; color: var(--c-gold); background: var(--c-darker);
-  padding: 2px 8px; border-radius: 10px; letter-spacing: 1px;
+.feat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-gold); border-color: var(--c-gold);
 }
-.feat-icon { font-size: 36px; margin: 12px 0 8px; }
-.feat h3 { font-size: 15px; color: var(--c-gold); margin: 0 0 6px; }
-.feat p { font-size: 12px; color: var(--color-text-muted); line-height: 1.6; margin: 0; }
-.feat-arrow {
-  font-size: 24px; color: var(--c-gold); padding-top: 60px;
-  opacity: 0.4;
-}
+.feat-card .feat-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+.feat-card h3 { font-size: 16px; color: var(--c-gold); margin: 0 0 8px; font-weight: 700; }
+.feat-card p { font-size: 13px; color: var(--color-text-muted); line-height: 1.7; margin: 0; }
 
 /* Footer */
 .footer {
@@ -264,9 +271,8 @@ async function tryDemo() {
   .format-hint { font-size: 11px; }
   .features { padding: 40px 20px; }
   .features h2 { font-size: 22px; }
-  .feature-strip { flex-direction: column; align-items: center; gap: 16px; }
-  .feat { width: 100%; max-width: 320px; }
-  .feat-arrow { transform: rotate(90deg); padding: 0; }
+  .feature-grid { grid-template-columns: 1fr; gap: 12px; }
+  .feat-card { padding: 24px 20px; }
   .film-strip { display: none; }
   .spotlight { width: 300px; height: 300px; top: -100px; }
 }
