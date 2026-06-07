@@ -20,6 +20,10 @@ import java.util.*;
 public class ImageService {
 
     private static final Logger log = LoggerFactory.getLogger(ImageService.class);
+    // Circuit breaker: stop trying after N consecutive TokenHub failures
+    private static final int MAX_CONSECUTIVE_FAILURES = 5;
+    private int consecutiveFailures = 0;
+    private long circuitOpenUntil = 0;
 
     @Value("${tokenhub.api-key}")
     private String apiKey;
@@ -208,6 +212,14 @@ public class ImageService {
      * Call TokenHub hy-image-lite API, then upload to COS for permanent storage.
      */
     private String generateWithTokenHub(String prompt) {
+        // Circuit breaker: if TokenHub consistently fails, stop trying to save DeepSeek credits
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            if (System.currentTimeMillis() < circuitOpenUntil) {
+                throw new RuntimeException("TokenHub已熔断: 连续失败" + consecutiveFailures
+                    + "次, " + (circuitOpenUntil - System.currentTimeMillis())/1000 + "秒后重试");
+            }
+            consecutiveFailures = 0; // reset after cooldown
+        }
         log.info("[生图] TokenHub请求开始, model={}, prompt前50字={}", model,
             prompt.length() > 50 ? prompt.substring(0, 50) + "..." : prompt);
         HttpHeaders headers = new HttpHeaders();
@@ -224,11 +236,18 @@ public class ImageService {
         ResponseEntity<String> response;
         try {
             response = restTemplate.postForEntity(apiUrl, entity, String.class);
+            consecutiveFailures = 0; // success → reset circuit breaker
             log.info("[生图] TokenHub HTTP状态={}, 响应长度={}",
                 response.getStatusCode().value(),
                 response.getBody() != null ? response.getBody().length() : 0);
         } catch (Exception e) {
-            log.error("[生图] TokenHub HTTP请求失败: {}", e.getMessage(), e);
+            consecutiveFailures++;
+            if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                circuitOpenUntil = System.currentTimeMillis() + 60_000; // 1 min cooldown
+                log.error("[生图] 熔断触发! 连续失败{}次, 暂停60秒", consecutiveFailures);
+            }
+            log.error("[生图] TokenHub HTTP请求失败({}/{}): {}",
+                consecutiveFailures, MAX_CONSECUTIVE_FAILURES, e.getMessage());
             throw new RuntimeException("TokenHub API请求失败: " + e.getMessage(), e);
         }
 
