@@ -66,6 +66,14 @@
           <el-button type="warning" @click="showCreate=true">＋ 新建项目</el-button>
         </div>
 
+        <!-- Role filter -->
+        <div class="role-filter" v-if="currentFolder === null">
+          <button :class="['rf-btn', {on: roleFilter==='all'}]" @click="roleFilter='all'">全部</button>
+          <button :class="['rf-btn', {on: roleFilter==='owner'}]" @click="roleFilter='owner'">👑 创建者</button>
+          <button :class="['rf-btn', {on: roleFilter==='admin'}]" @click="roleFilter='admin'">🔧 管理员</button>
+          <button :class="['rf-btn', {on: roleFilter==='read'}]" @click="roleFilter='read'">👁 只读</button>
+        </div>
+
         <!-- Quick start -->
         <div class="quick-start" @click="showCreate=true">
           <div class="qs-icon">＋</div>
@@ -182,9 +190,13 @@ const folderName = computed(() => {
 })
 const dialogWidth = ref('640px')
 function onResize() { dialogWidth.value = window.innerWidth < 768 ? '95%' : '640px' }
+const roleFilter = ref('all')
 const filtered = computed(() => {
-  if (currentFolder.value === null) return projects.value
-  return projects.value.filter(p => p.folderId === currentFolder.value)
+  let list = currentFolder.value === null ? projects.value : projects.value.filter(p => p.folderId === currentFolder.value)
+  if (roleFilter.value === 'owner') list = list.filter(p => p.isOwner)
+  else if (roleFilter.value === 'admin') list = list.filter(p => !p.isOwner && p.permission === 'ADMIN')
+  else if (roleFilter.value === 'read') list = list.filter(p => !p.isOwner && p.permission === 'READ')
+  return list
 })
 
 onMounted(async () => {
@@ -279,6 +291,15 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .main { flex: 1; padding: 24px }
 .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px }
 .main-header h2 { font-size: 22px; font-weight: 800; color: var(--c-gold); margin: 0; font-family: var(--font-serif) }
+
+.role-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap }
+.rf-btn {
+  padding: 6px 16px; border-radius: 20px; border: 1px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text-muted); cursor: pointer;
+  font-size: 13px; transition: all var(--transition);
+}
+.rf-btn:hover { border-color: var(--c-gold); color: var(--c-gold) }
+.rf-btn.on { background: var(--c-gold); color: var(--c-darker); border-color: var(--c-gold); font-weight: 600 }
 
 .quick-start {
   background: var(--color-surface); border: 2px dashed var(--color-border); border-radius: var(--radius-lg);
