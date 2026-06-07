@@ -69,7 +69,7 @@
       <div class="resize-handle" @mousedown="startResize($event, 'left')" :class="{active:resizing==='left'}"></div>
 
       <!-- Center: YAML -->
-      <div class="col cc" :style="{width: centerW+'%'}">
+      <div class="col cc" :class="{wide:!showR}" :style="{width: centerW+'%'}">
         <div class="ct"><span>📄 剧本</span>
           <div style="display:flex;gap:6px">
             <el-button v-if="!isReadOnly" size="small" @click="toggleEdit"
@@ -761,10 +761,10 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .ch.on{background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);border-color:transparent;font-weight:700;box-shadow:0 2px 8px rgba(212,168,83,0.3)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
 .col{display:flex;flex-direction:column;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.cl{width:30%;min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
-.cc{width:45%;min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
-.cc.wide{width:70%}
-.cr{width:25%;min-width:200px;background:rgba(255,255,255,0.04)}
+.cl{min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc{min-width:200px;border-right:1px solid var(--color-border);background:rgba(255,255,255,0.04)}
+.cc.wide{flex:1}
+.cr{min-width:200px;flex:1;background:rgba(255,255,255,0.04)}
 /* Resize handles */
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background .2s;flex-shrink:0;position:relative;z-index:10}
 .resize-handle:hover,.resize-handle.active{background:var(--c-gold)}
