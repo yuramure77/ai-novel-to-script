@@ -5,6 +5,7 @@ import com.scripttool.model.dto.ScriptVersionResponse;
 import com.scripttool.model.entity.Project;
 import com.scripttool.model.entity.ScriptVersion;
 import com.scripttool.repository.ScriptVersionRepository;
+import com.scripttool.service.CollaborationService;
 import com.scripttool.service.ProjectService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
@@ -22,19 +23,24 @@ public class ScriptController {
 
     private final ProjectService projectService;
     private final ScriptVersionRepository versionRepository;
+    private final CollaborationService collabService;
 
     public ScriptController(ProjectService projectService,
-                            ScriptVersionRepository versionRepository) {
+                            ScriptVersionRepository versionRepository,
+                            CollaborationService collabService) {
         this.projectService = projectService;
         this.versionRepository = versionRepository;
+        this.collabService = collabService;
     }
 
+    /** Get script versions — any collaborator can view */
     @GetMapping("/project/{projectId}/versions")
     public ResponseEntity<ApiResponse<?>> listVersions(@PathVariable Long projectId,
                                                         Authentication auth) {
         try {
+            Long userId = (Long) auth.getPrincipal();
             Project project = projectService.getProject(projectId);
-            if (!project.getUserId().equals((Long) auth.getPrincipal())) {
+            if (!collabService.canView(projectId, userId)) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
             }
 
@@ -48,12 +54,14 @@ public class ScriptController {
         }
     }
 
+    /** Get latest script — any collaborator can view */
     @GetMapping("/project/{projectId}/latest")
     public ResponseEntity<ApiResponse<?>> getLatest(@PathVariable Long projectId,
                                                      Authentication auth) {
         try {
+            Long userId = (Long) auth.getPrincipal();
             Project project = projectService.getProject(projectId);
-            if (!project.getUserId().equals((Long) auth.getPrincipal())) {
+            if (!collabService.canView(projectId, userId)) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
             }
 
@@ -84,13 +92,15 @@ public class ScriptController {
         response.getWriter().write(version.getYamlContent());
     }
 
+    /** Save edited YAML — only admin/owner can edit */
     @PostMapping("/project/{projectId}/save")
     public ResponseEntity<ApiResponse<?>> saveEdited(@PathVariable Long projectId,
                                                       @RequestBody Map<String, String> body,
                                                       Authentication auth) {
         try {
+            Long userId = (Long) auth.getPrincipal();
             Project project = projectService.getProject(projectId);
-            if (!project.getUserId().equals((Long) auth.getPrincipal())) {
+            if (!collabService.canEdit(projectId, userId)) {
                 return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
             }
             String yamlContent = body.get("yamlContent");
