@@ -798,8 +798,8 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .yv :deep(.hljs-type){color:#d4a853}
 .yv :deep(.hljs-meta){color:#8b7b65}
 .rtt{height:100%;display:flex;flex-direction:column}
-.rtt :deep(.el-tabs__header){margin:0;padding:0 8px}
-.rtt :deep(.el-tabs__nav-wrap)::after{height:1px;background:var(--color-border-light)}
+.rtt :deep(.el-tabs__header){margin:0;padding:0 8px;background:rgba(255,255,255,0.06);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-bottom:1px solid var(--color-border-light)}
+.rtt :deep(.el-tabs__nav-wrap)::after{display:none}
 .rtt :deep(.el-tabs__nav){display:flex;justify-content:space-evenly;width:100%}
 .rtt :deep(.el-tabs__item){flex:1;text-align:center;font-size:12px;font-weight:500;color:var(--color-text-muted);height:40px;line-height:40px;padding:0 12px;transition:all .2s;letter-spacing:1px}
 .rtt :deep(.el-tabs__item:hover){color:var(--c-gold)}
