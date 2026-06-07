@@ -26,6 +26,8 @@ public class Collaboration {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    private LocalDateTime lastSeenAt;  // For active user presence
+
     public enum Permission {
         ADMIN,   // Can edit, generate, manage collaborators
         READ     // Can view only
@@ -59,4 +61,7 @@ public class Collaboration {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getLastSeenAt() { return lastSeenAt; }
+    public void setLastSeenAt(LocalDateTime lastSeenAt) { this.lastSeenAt = lastSeenAt; }
 }

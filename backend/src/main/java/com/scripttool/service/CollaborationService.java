@@ -9,9 +9,8 @@ import com.scripttool.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 public class CollaborationService {
@@ -72,6 +71,7 @@ public class CollaborationService {
             throw new RuntimeException("只有项目拥有者可以管理协作者");
         }
 
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(2);
         return collabRepo.findByProjectId(projectId).stream().map(c -> {
             User user = userRepo.findById(c.getUserId()).orElse(null);
             Map<String, Object> m = new HashMap<>();
@@ -81,6 +81,8 @@ public class CollaborationService {
             m.put("nickname", user != null ? user.getNickname() : "");
             m.put("permission", c.getPermission().name());
             m.put("createdAt", c.getCreatedAt());
+            m.put("online", c.getLastSeenAt() != null && c.getLastSeenAt().isAfter(cutoff));
+            m.put("lastSeenAt", c.getLastSeenAt());
             return m;
         }).toList();
     }
@@ -176,5 +178,94 @@ public class CollaborationService {
                 .map(c -> projectRepo.findById(c.getProjectId()).orElse(null))
                 .filter(p -> p != null)
                 .toList();
+    }
+
+    /**
+     * Join a project via invite token. User gets READ permission by default.
+     */
+    @Transactional
+    public Map<String, Object> joinByToken(String token, Long userId) {
+        Project project = projectRepo.findByInviteToken(token)
+                .orElseThrow(() -> new RuntimeException("邀请链接无效或已失效"));
+
+        if (project.getUserId().equals(userId)) {
+            throw new RuntimeException("不能加入自己的项目");
+        }
+
+        if (collabRepo.existsByProjectIdAndUserId(project.getId(), userId)) {
+            throw new RuntimeException("你已经是该项目的协作者");
+        }
+
+        Collaboration collab = collabRepo.save(
+                new Collaboration(project.getId(), userId, Collaboration.Permission.READ));
+        collab.setLastSeenAt(LocalDateTime.now());
+        collabRepo.save(collab);
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectId", project.getId());
+        m.put("title", project.getTitle());
+        m.put("permission", "READ");
+        return m;
+    }
+
+    /**
+     * Update last-seen timestamp for presence tracking.
+     */
+    @Transactional
+    public void updatePresence(Long projectId, Long userId) {
+        // Owner always has presence
+        Project project = projectRepo.findById(projectId).orElse(null);
+        if (project == null) return;
+
+        if (project.getUserId().equals(userId)) return; // owner doesn't need presence entry
+
+        collabRepo.findByProjectIdAndUserId(projectId, userId).ifPresent(collab -> {
+            collab.setLastSeenAt(LocalDateTime.now());
+            collabRepo.save(collab);
+        });
+    }
+
+    /**
+     * Get users active in the last 2 minutes (including the owner).
+     */
+    public List<Map<String, Object>> getActiveUsers(Long projectId, Long currentUserId) {
+        Project project = projectRepo.findById(projectId).orElse(null);
+        if (project == null) return List.of();
+
+        List<Map<String, Object>> users = new ArrayList<>();
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(2);
+
+        // Add owner (always active if they're the current user or have recent presence)
+        User owner = userRepo.findById(project.getUserId()).orElse(null);
+        if (owner != null) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("userId", owner.getId());
+            m.put("username", owner.getUsername());
+            m.put("nickname", owner.getNickname() != null ? owner.getNickname() : owner.getUsername());
+            m.put("isOwner", true);
+            m.put("permission", "ADMIN");
+            m.put("online", true); // owner is always online on their own project
+            users.add(m);
+        }
+
+        // Add active collaborators
+        List<Collaboration> collabs = collabRepo.findByProjectId(projectId);
+        for (var c : collabs) {
+            if (c.getLastSeenAt() != null && c.getLastSeenAt().isAfter(cutoff)) {
+                User user = userRepo.findById(c.getUserId()).orElse(null);
+                if (user != null && !user.getId().equals(project.getUserId())) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("userId", user.getId());
+                    m.put("username", user.getUsername());
+                    m.put("nickname", user.getNickname() != null ? user.getNickname() : user.getUsername());
+                    m.put("isOwner", false);
+                    m.put("permission", c.getPermission().name());
+                    m.put("online", true);
+                    users.add(m);
+                }
+            }
+        }
+
+        return users;
     }
 }

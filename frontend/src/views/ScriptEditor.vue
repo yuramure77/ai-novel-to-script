@@ -10,6 +10,12 @@
         <el-tag v-if="isReadOnly" type="info" size="small" round>👁 只读</el-tag>
       </div>
       <div class="tbr">
+        <!-- Active users -->
+        <div v-if="activeUsers.length > 1" class="active-users" title="当前在线用户">
+          <span v-for="(u,i) in activeUsers" :key="i" class="au-avatar" :title="u.nickname || u.username">
+            {{ (u.nickname || u.username).charAt(0) }}
+          </span>
+        </div>
         <el-switch v-model="dark" inline-prompt active-text="🌙" inactive-text="☀️" @change="tDark" size="small" />
         <el-dropdown v-if="latestVersion" @command="expCmd">
           <el-button size="small" type="warning" plain>📥 导出 ▾</el-button>
@@ -329,6 +335,9 @@ const sceneImgs = ref([])
 // Plan chapters (from backend plan event)
 const planChapters = ref([])
 
+// Active users presence
+const activeUsers = ref([]); let presenceTimer = null
+
 // Search
 const searchOn = ref(false); const sq = ref(''); const sc = ref(0); const sr = ref(null); const tp = ref(null)
 
@@ -548,6 +557,9 @@ onMounted(async()=>{
     cmsgs.value=((await getHistory(pid)).data.data||[]).map(m=>({role:m.role,content:m.content}))
     // Restore saved images after YAML parsing
     restoreImages()
+    // Start presence ping
+    pingPresence()
+    presenceTimer = setInterval(pingPresence, 30000)
   }catch{}
 })
 
@@ -559,7 +571,19 @@ watch(sceneImgs, (val) => {
     restoreImages()
   }
 })
-onUnmounted(()=>{window.removeEventListener('keydown', onKeydown)})
+onUnmounted(()=>{
+  window.removeEventListener('keydown', onKeydown)
+  if(presenceTimer) clearInterval(presenceTimer)
+})
+
+// Presence ping + fetch active users
+async function pingPresence(){
+  try {
+    await api.post(`/projects/${pid}/presence`)
+    const r = await api.get(`/projects/${pid}/active-users`)
+    activeUsers.value = r.data.data || []
+  } catch {}
+}
 
 // Split
 async function doSplit(){splitting.value=true;try{const r=await splitChapters(pid);chapters.value=r.data.data.chapters||[];if(chapters.value.length)ac.value=0}catch(e){ElMessage.error(e.response?.data?.message||'分章失败')}finally{splitting.value=false}}
@@ -937,6 +961,9 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .tbl{display:flex;align-items:center;gap:8px}
 .tbl h2{font-size:15px;margin:0;color:var(--color-text);font-weight:600;cursor:pointer}
 .tbr{display:flex;align-items:center;gap:6px}
+/* Active users avatars */
+.active-users{display:flex;align-items:center;gap:2px;margin-right:6px}
+.au-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--c-gold),var(--c-amber));color:var(--c-darker);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid var(--color-surface);cursor:default}
 .sbar{padding:8px 12px;background:var(--color-surface);border-bottom:1px solid var(--color-border);flex-shrink:0}
 .act{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:linear-gradient(180deg,var(--color-surface),var(--color-bg));border-bottom:1px solid var(--color-border);flex-shrink:0}
 .actl{display:flex;align-items:center;gap:12px}

@@ -30,6 +30,9 @@ public class Project {
     @Enumerated(EnumType.STRING)
     private ProjectStatus status = ProjectStatus.DRAFT;
 
+    @Column(length = 36, unique = true)
+    private String inviteToken;  // UUID for shareable invite link
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -87,4 +90,7 @@ public class Project {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getInviteToken() { return inviteToken; }
+    public void setInviteToken(String inviteToken) { this.inviteToken = inviteToken; }
 }

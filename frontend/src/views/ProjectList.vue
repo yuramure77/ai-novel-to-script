@@ -80,7 +80,7 @@
               <div class="card-head">
                 <h3>{{ p.title }}</h3>
                 <el-tag v-if="!p.isOwner" size="small" round :type="p.permission==='ADMIN'?'warning':'info'">
-                  {{ p.permission==='ADMIN'?'🔧 协管':'👁 只读' }}
+                  {{ p.permission==='ADMIN'?'🔧 管理员':'👁 只读' }}
                 </el-tag>
               </div>
               <div class="card-info">
@@ -304,7 +304,7 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .card-head { display: flex; justify-content: space-between; align-items: center }
 .card-head h3 { font-size: 15px; color: var(--color-text); margin: 0; font-weight: 600 }
 .card-info { display: flex; justify-content: space-between; color: var(--color-text-muted); font-size: 12px; margin-top: 10px }
-.card-hover { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity var(--transition) }
+.card-hover { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity var(--transition) }
 .card:hover .card-hover { opacity: 1 }
 
 .drop-zone { text-align: center; padding: 20px; cursor: pointer }
