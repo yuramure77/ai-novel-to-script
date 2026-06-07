@@ -167,13 +167,13 @@
               <div class="chat-input-bar">
                 <el-input
                   v-model="ci"
-                  placeholder="输入修改建议或问题，回车发送..."
+                  :placeholder="isReadOnly?'只读模式 — 无法使用AI助手':'输入修改建议或问题，回车发送...'"
                   @keyup.enter="snd"
-                  :disabled="cw"
+                  :disabled="cw || isReadOnly"
                   size="default"
                   class="chat-input-inner"
                 />
-                <el-button type="warning" @click="snd" :loading="cw" size="default" round>发送</el-button>
+                <el-button type="warning" @click="snd" :loading="cw" :disabled="isReadOnly" size="default" round>发送</el-button>
               </div>
             </div>
           </el-tab-pane>
@@ -717,6 +717,7 @@ async function svY(){if(!ey.value.trim())return;saveB.value=true;try{const r=awa
 
 // Chat
 async function snd(){
+  if(isReadOnly.value)return
   const m=ci.value.trim();if(!m||cw.value)return;ci.value=''
   cmsgs.value.push({role:'user',content:m});cw.value=true
   await nextTick();cbx.value&&(cbx.value.scrollTop=cbx.value.scrollHeight)
@@ -729,6 +730,7 @@ async function snd(){
 
 // Actions
 function doAction(a,msg,i){
+  if(isReadOnly.value){ElMessage.warning('只读模式无法应用修改');return}
   if(a.action==='apply_yaml'&&msg.yamlPatch){
     ey.value = msg.yamlPatch; yaml.value = msg.yamlPatch; edit.value = true
     // Force Vue reactivity by replacing the message object

@@ -3,6 +3,7 @@ package com.scripttool.controller;
 import com.scripttool.model.dto.ApiResponse;
 import com.scripttool.model.entity.Message;
 import com.scripttool.service.ChatService;
+import com.scripttool.service.CollaborationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +17,11 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatService chatService;
+    private final CollaborationService collabService;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, CollaborationService collabService) {
         this.chatService = chatService;
+        this.collabService = collabService;
     }
 
     @PostMapping("/{projectId}")
@@ -27,6 +30,9 @@ public class ChatController {
                                                 Authentication auth) {
         try {
             Long userId = (Long) auth.getPrincipal();
+            if (!collabService.canEdit(projectId, userId)) {
+                return ResponseEntity.status(403).body(ApiResponse.error(403, "只读用户不能使用AI助手"));
+            }
             String message = body.get("message");
             if (message == null || message.isBlank()) {
                 return ResponseEntity.badRequest().body(ApiResponse.error(400, "消息不能为空"));
@@ -45,7 +51,11 @@ public class ChatController {
     }
 
     @GetMapping("/{projectId}/history")
-    public ResponseEntity<ApiResponse<?>> history(@PathVariable Long projectId) {
+    public ResponseEntity<ApiResponse<?>> history(@PathVariable Long projectId, Authentication auth) {
+        Long userId = (Long) auth.getPrincipal();
+        if (!collabService.canView(projectId, userId)) {
+            return ResponseEntity.status(403).body(ApiResponse.error(403, "无权访问"));
+        }
         List<Message> messages = chatService.getHistory(projectId);
         List<Map<String, Object>> result = messages.stream()
                 .map(m -> Map.<String, Object>of("role", m.getRole(), "content", m.getContent()))
