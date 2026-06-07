@@ -252,9 +252,13 @@
     </el-drawer>
 
     <!-- Image preview dialog -->
-    <el-dialog v-model="showPreview" title="图片预览" width="auto" :close-on-click-modal="true" :append-to-body="true">
-      <img :src="previewUrl" style="max-width:90vw;max-height:80vh;border-radius:8px" @click="showPreview=false" />
-      <p v-if="previewPrompt" style="color:var(--color-text-muted);font-size:12px;margin-top:8px;max-width:90vw">📝 {{ previewPrompt }}</p>
+    <el-dialog v-model="showPreview" title="图片预览" width="560px" :close-on-click-modal="true" :append-to-body="true">
+      <img :src="previewUrl" style="width:100%;max-height:60vh;object-fit:contain;border-radius:8px" @click="showPreview=false" />
+      <p v-if="previewPrompt" style="color:var(--color-text-muted);font-size:11px;margin-top:10px;line-height:1.5;word-break:break-all">📝 {{ previewPrompt }}</p>
+      <template #footer>
+        <el-button @click="downloadImg(previewUrl)">📥 下载</el-button>
+        <el-button type="warning" @click="showPreview=false">关闭</el-button>
+      </template>
     </el-dialog>
 
     <!-- Image version history dialog -->
@@ -343,6 +347,9 @@ async function restoreImages() {
 // Image preview
 const showPreview = ref(false); const previewUrl = ref(''); const previewPrompt = ref('')
 function previewImg(url, prompt) { previewUrl.value = url; previewPrompt.value = prompt || ''; showPreview.value = true }
+function downloadImg(url) {
+  const a = document.createElement('a'); a.href = url; a.download = 'scene-' + Date.now() + '.jpg'; a.click()
+}
 
 // Image version history
 const showVerDialog = ref(false); const imgVersions = ref([])
