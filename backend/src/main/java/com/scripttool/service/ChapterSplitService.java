@@ -246,7 +246,7 @@ public class ChapterSplitService {
             }
             String chapterText = content.toString().trim();
             if (chapterText.length() >= 50) {
-                String label = chapterText.length() > 20 ? chapterText.substring(0, 18) + "..." : chapterText;
+                String label = "第" + chapterNum + "部分";
                 chapters.add(new ChapterResult(chapterNum++, label, chapterText));
             }
             paraIdx = end;
@@ -270,8 +270,8 @@ public class ChapterSplitService {
             try {
                 String content = text.substring(start, Math.min(end, text.length())).trim();
                 if (content.length() >= 100) {
-                    String label = content.length() > 20 ? content.substring(0, 18) + ".." : content;
-                chapters.add(new ChapterResult(num++, label, content));
+                    String label = "第" + num + "部分";
+                    chapters.add(new ChapterResult(num++, label, content));
                 }
             } catch (StringIndexOutOfBoundsException e) { break; }
             start = end;
