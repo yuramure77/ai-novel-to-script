@@ -518,11 +518,18 @@ onMounted(async()=>{
     if(v.data.data){latestVersion.value=v.data.data;yaml.value=v.data.data.yamlContent}
     if(originalText.value&&!chapters.value.length)await doSplit()
     cmsgs.value=((await getHistory(pid)).data.data||[]).map(m=>({role:m.role,content:m.content}))
-    // Restore saved images after YAML parsing (wait for watch to parse scenes)
-    await nextTick()
-    await nextTick()
+    // Restore saved images after YAML parsing
     restoreImages()
   }catch{}
+})
+
+// Watch for scenes to be parsed, then restore images
+let sceneWatchDone = false
+watch(sceneImgs, (val) => {
+  if (!sceneWatchDone && val && val.length > 0) {
+    sceneWatchDone = true
+    restoreImages()
+  }
 })
 onUnmounted(()=>{window.removeEventListener('keydown', onKeydown)})
 

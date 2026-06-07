@@ -128,9 +128,13 @@ public class ScriptService {
 
                 // --- Checkpoint lookup ---
                 GenerationProgress cp = progressRepo.findByProjectId(projectId).orElse(null);
-                int nextVersion = cp != null ? cp.getVersionNumber() : 1;
-                if (projectService.getLatestScriptVersion(projectId) != null) {
-                    nextVersion = projectService.getLatestScriptVersion(projectId).getVersionNumber() + 1;
+                int nextVersion = projectService.getLatestScriptVersion(projectId) != null ?
+                    projectService.getLatestScriptVersion(projectId).getVersionNumber() + 1 : 1;
+
+                // Stale checkpoint from a previous run? Delete and start fresh
+                if (cp != null && cp.getVersionNumber() != nextVersion) {
+                    progressRepo.deleteByProjectId(projectId);
+                    cp = null;
                 }
 
                 if (cp != null && cp.isComplete()) {
