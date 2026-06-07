@@ -6,6 +6,8 @@ import com.scripttool.config.DeepSeekConfig;
 import com.scripttool.model.entity.ImageVersion;
 import com.scripttool.model.entity.ImageVersion.ImageType;
 import com.scripttool.repository.ImageVersionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -16,6 +18,8 @@ import java.util.*;
 
 @Service
 public class ImageService {
+
+    private static final Logger log = LoggerFactory.getLogger(ImageService.class);
 
     @Value("${tokenhub.api-key}")
     private String apiKey;
@@ -51,6 +55,7 @@ public class ImageService {
      */
     public Map<String, Object> generateSceneImage(Long projectId, int sceneIndex,
                                                    String desc, String location, String time, String mood) {
+        log.info("[生图] 场景图开始 projectId={} idx={}", projectId, sceneIndex);
         // 1. Build rich prompt via DeepSeek
         String base = String.format("场景：%s。地点：%s。时辰：%s。氛围：%s。",
                 desc != null ? desc : "戏剧场景",
@@ -60,12 +65,14 @@ public class ImageService {
         String visualDesc = enrichPrompt("场景", base, "", "");
         String prompt = visualDesc + "，电影级构图与光影，广角镜头，丰富的环境细节，"
                 + "史诗感，古装大片风格，高质量渲染，8K超清画质";
+        log.info("[生图] 场景prompt生成完成, 长度={}", prompt.length());
 
         // 2. Generate image
         String url = generateWithTokenHub(prompt);
 
         // 3. Save version
         versionRepo.save(new ImageVersion(projectId, ImageType.SCENE, sceneIndex, url, prompt));
+        log.info("[生图] 场景图完成 idx={}", sceneIndex);
 
         return Map.of("url", url, "prompt", prompt);
     }
@@ -192,7 +199,7 @@ public class ImageService {
             String content = root.path("choices").get(0).path("message").path("content").asText();
             return content != null && !content.isBlank() ? content.trim() : baseInfo;
         } catch (Exception e) {
-            System.err.println("[ImageService] DeepSeek enrichment failed: " + e.getMessage());
+            log.warn("[生图] DeepSeek提示词增强失败, type={}, 使用原始描述. 错误: {}", type, e.getMessage());
             return baseInfo; // fallback to original
         }
     }
@@ -201,6 +208,8 @@ public class ImageService {
      * Call TokenHub hy-image-lite API, then upload to COS for permanent storage.
      */
     private String generateWithTokenHub(String prompt) {
+        log.info("[生图] TokenHub请求开始, model={}, prompt前50字={}", model,
+            prompt.length() > 50 ? prompt.substring(0, 50) + "..." : prompt);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
@@ -212,11 +221,22 @@ public class ImageService {
         );
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.postForEntity(apiUrl, entity, String.class);
+            log.info("[生图] TokenHub HTTP状态={}, 响应长度={}",
+                response.getStatusCode().value(),
+                response.getBody() != null ? response.getBody().length() : 0);
+        } catch (Exception e) {
+            log.error("[生图] TokenHub HTTP请求失败: {}", e.getMessage(), e);
+            throw new RuntimeException("TokenHub API请求失败: " + e.getMessage(), e);
+        }
+
         JsonNode root;
         try {
             root = objectMapper.readTree(response.getBody());
         } catch (Exception e) {
+            log.error("[生图] TokenHub响应JSON解析失败: {}", response.getBody(), e);
             throw new RuntimeException("Failed to parse TokenHub response", e);
         }
 
@@ -229,17 +249,28 @@ public class ImageService {
         }
 
         if (imageUrl == null || imageUrl.isEmpty()) {
-            throw new RuntimeException("TokenHub returned no image URL: " + response.getBody());
+            // Check for error message in response
+            String errMsg = root.has("message") ? root.get("message").asText()
+                : root.has("error") ? root.get("error").asText() : "无URL返回";
+            log.error("[生图] TokenHub未返回图片URL. message={}, 完整响应={}", errMsg, response.getBody());
+            throw new RuntimeException("TokenHub生图失败: " + errMsg);
         }
+
+        log.info("[生图] TokenHub返回URL: {}", imageUrl.length() > 80 ? imageUrl.substring(0, 80) + "..." : imageUrl);
 
         // Upload to COS for permanent URL
         if (!cosBucket.isEmpty() && cosService != null) {
             try {
+                log.info("[生图] 上传COS...");
                 byte[] imageBytes = cosService.downloadImage(imageUrl);
-                return cosService.uploadImage(imageBytes, "image");
+                String cosUrl = cosService.uploadImage(imageBytes, "image");
+                log.info("[生图] COS上传成功: {}", cosUrl.length() > 80 ? cosUrl.substring(0, 80) + "..." : cosUrl);
+                return cosUrl;
             } catch (Exception e) {
-                System.err.println("[ImageService] COS upload failed: " + e.getMessage());
+                log.warn("[生图] COS上传失败, 使用TokenHub原始URL: {}", e.getMessage());
             }
+        } else {
+            log.debug("[生图] COS未配置(bucket={}, cosService={}), 使用原始URL", cosBucket, cosService);
         }
 
         return imageUrl;
