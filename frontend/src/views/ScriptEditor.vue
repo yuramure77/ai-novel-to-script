@@ -769,7 +769,7 @@ function fmt(d){return d?new Date(d).toLocaleString('zh-CN'):''}
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background .2s;flex-shrink:0;position:relative;z-index:10}
 .resize-handle:hover,.resize-handle.active{background:var(--c-gold)}
 .resize-handle::after{content:'';position:absolute;inset:-4px -6px}
-.ct{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0;background:rgba(255,255,255,0.06);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ct{display:flex;justify-content:space-between;align-items:center;padding:0 14px;height:40px;font-size:12px;font-weight:600;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border-light);flex-shrink:0;background:rgba(255,255,255,0.06);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .cb{flex:1;overflow:auto;padding:12px}
 .cb pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-serif);font-size:14px;line-height:1.9;color:var(--color-text)}
 .emp{flex:1;display:flex;align-items:center;justify-content:center}
