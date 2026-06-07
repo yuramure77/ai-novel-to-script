@@ -268,10 +268,19 @@ public class ImageService {
         }
 
         if (imageUrl == null || imageUrl.isEmpty()) {
-            // Check for error message in response
-            String errMsg = root.has("message") ? root.get("message").asText()
-                : root.has("error") ? root.get("error").asText() : "无URL返回";
-            log.error("[生图] TokenHub未返回图片URL. message={}, 完整响应={}", errMsg, response.getBody());
+            // Check for JobNumExceed — retry after delay
+            JsonNode errNode = root.has("error") ? root.get("error") : null;
+            String errCode = errNode != null && errNode.has("code") ? errNode.get("code").asText() : "";
+            String errMsg = errNode != null && errNode.has("message") ? errNode.get("message").asText()
+                : "无URL返回";
+
+            if ("RequestLimitExceeded.JobNumExceed".equals(errCode)) {
+                log.info("[生图] TokenHub并发限制, 等待3秒重试...");
+                try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                return generateWithTokenHub(prompt); // retry once
+            }
+
+            log.error("[生图] TokenHub未返回图片URL. code={} message={}", errCode, errMsg);
             throw new RuntimeException("TokenHub生图失败: " + errMsg);
         }
 

@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
 public class ScriptService {
 
     private static final Logger log = LoggerFactory.getLogger(ScriptService.class);
-    private static final ExecutorService sceneImgExecutor = Executors.newFixedThreadPool(4);
+    private static final ExecutorService sceneImgExecutor = Executors.newFixedThreadPool(1); // TokenHub limit: 1 concurrent job
 
     private final ProjectService projectService;
     private final ChapterSplitService chapterSplitService;
