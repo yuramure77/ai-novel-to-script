@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="👥 协作管理"
-    width="520px"
+    width="580px"
     :close-on-click-modal="false"
     :append-to-body="true"
   >
@@ -10,11 +10,11 @@
     <div class="invite-section">
       <div class="invite-label">🔗 邀请链接</div>
       <div class="invite-row">
-        <el-input :model-value="inviteLink" readonly size="default" placeholder="点击生成邀请链接...">
-          <template #append>
-            <el-button v-if="inviteLink" @click="copyLink" type="primary" size="default">📋 复制</el-button>
-          </template>
-        </el-input>
+        <div class="link-display" v-if="inviteLink">
+          <code class="link-text">{{ inviteLink }}</code>
+        </div>
+        <span v-else class="link-placeholder">点击下方按钮生成邀请链接</span>
+        <el-button v-if="inviteLink" size="small" type="primary" @click="copyLink" style="flex-shrink:0">📋 复制</el-button>
       </div>
       <div class="invite-actions">
         <el-button size="small" @click="genLink" :loading="genLinkBusy" type="warning" plain>
@@ -105,8 +105,22 @@ async function genLink() {
 }
 
 function copyLink() {
-  navigator.clipboard.writeText(inviteLink.value).then(() => ElMessage.success('已复制到剪贴板'))
-    .catch(() => ElMessage.error('复制失败'))
+  // Fallback for non-HTTPS or browsers without clipboard API
+  const text = inviteLink.value
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => ElMessage.success('已复制'))
+      .catch(() => fallbackCopy(text))
+  } else {
+    fallbackCopy(text)
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea')
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'
+  document.body.appendChild(ta); ta.select()
+  try { document.execCommand('copy'); ElMessage.success('已复制') }
+  catch { ElMessage.error('复制失败，请手动选择链接') }
+  finally { document.body.removeChild(ta) }
 }
 
 async function doAdd() {
@@ -132,7 +146,10 @@ async function doRemove(collabId) {
 <style scoped>
 .invite-section { margin-bottom: 4px }
 .invite-label { font-size: 13px; font-weight: 600; color: var(--color-text); margin-bottom: 8px }
-.invite-row { margin-bottom: 6px }
+.invite-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px }
+.link-display { flex: 1; overflow-x: auto; white-space: nowrap; background: var(--color-bg-alt, rgba(255,255,255,0.04)); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 8px 10px }
+.link-text { font-family: var(--font-mono); font-size: 11px; color: var(--c-gold); word-break: keep-all }
+.link-placeholder { font-size: 12px; color: var(--color-text-muted) }
 .invite-actions { display: flex; align-items: center; gap: 10px }
 .invite-hint { font-size: 11px; color: var(--color-text-muted) }
 .add-row { display: flex; gap: 8px; margin-bottom: 16px }
