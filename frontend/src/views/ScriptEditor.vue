@@ -1,5 +1,5 @@
 <template>
-  <div class="editor" @keydown="onKeydown">
+  <div class="editor">
     <!-- Top bar -->
     <header class="tb">
       <div class="tbl">
@@ -277,7 +277,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import hljs from 'highlight.js/lib/core'
@@ -486,6 +486,7 @@ watch(yaml,()=>{
 })
 
 onMounted(async()=>{
+  window.addEventListener('keydown', onKeydown)
   dark.value = document.documentElement.classList.contains('light')
   try{
     const r = await getProject(pid); const d = r.data.data
@@ -500,6 +501,7 @@ onMounted(async()=>{
     restoreImages()
   }catch{}
 })
+onUnmounted(()=>{window.removeEventListener('keydown', onKeydown)})
 
 // Split
 async function doSplit(){splitting.value=true;try{const r=await splitChapters(pid);chapters.value=r.data.data.chapters||[];if(chapters.value.length)ac.value=0}catch(e){ElMessage.error(e.response?.data?.message||'分章失败')}finally{splitting.value=false}}
@@ -733,11 +735,36 @@ function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g
 
 // Keys
 function onKeydown(e){
-  if((e.ctrlKey||e.metaKey)&&e.key==='f'){e.preventDefault();searchOn.value=!searchOn.value;if(searchOn.value)nextTick(()=>sr.value?.focus())}
-  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!gen.value&&!isReadOnly.value){e.preventDefault();doGen()}
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'&&edit.value&&!isReadOnly.value){e.preventDefault();svY()}
-  if(e.key==='Escape'&&searchOn.value)searchOn.value=false
+  // Don't intercept shortcuts when typing in input fields (except Ctrl+S in the YAML textarea)
+  const tag = e.target.tagName
+  const isInput = tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'
+  const isYamlEdit = e.target.classList.contains('ye')
+
+  // Ctrl+Enter → generate (anywhere)
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!gen.value&&!isReadOnly.value){
+    e.preventDefault();doGen();return
+  }
+
+  // Ctrl+S → save YAML (only in edit mode, works in the YAML textarea)
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){
+    if(edit.value&&!isReadOnly.value){e.preventDefault();svY();return}
+  }
+
+  // Ctrl+F → toggle search (not in inputs, or use Escape to close)
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'){
+    if(!isInput||isYamlEdit){
+      e.preventDefault()
+      searchOn.value=!searchOn.value
+      if(searchOn.value)nextTick(()=>sr.value?.focus())
+      return
+    }
+  }
+
+  // Escape → close search
+  if(e.key==='Escape'&&searchOn.value){searchOn.value=false}
 }
+
+// Keyboard shortcuts registered in onMounted below
 
 function tDark(v){document.documentElement.classList.toggle('light',v);localStorage.setItem('light',v?'1':'0')}
 function rl(r){return{protagonist:'主角',antagonist:'反派',supporting:'配角',minor:'次要'}[r]||r||''}
