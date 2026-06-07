@@ -4,7 +4,7 @@
     title="👥 协作管理"
     width="580px"
     :close-on-click-modal="false"
-    :append-to-body="true"
+    :append-to-body="false"
   >
     <!-- Invite link section -->
     <div class="invite-section">
