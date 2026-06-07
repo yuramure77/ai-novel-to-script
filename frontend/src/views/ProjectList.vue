@@ -63,7 +63,12 @@
       <main class="main">
         <div class="main-header">
           <h2>{{ currentFolder ? folderName : '全部项目' }}</h2>
-          <el-button type="warning" @click="showCreate=true">＋ 新建项目</el-button>
+          <div class="header-right">
+            <el-input v-model="searchQuery" placeholder="搜索项目..." size="default" clearable class="search-input">
+              <template #prefix><span>🔍</span></template>
+            </el-input>
+            <el-button type="warning" @click="showCreate=true">＋ 新建项目</el-button>
+          </div>
         </div>
 
         <!-- Role filter -->
@@ -190,12 +195,17 @@ const folderName = computed(() => {
 })
 const dialogWidth = ref('640px')
 function onResize() { dialogWidth.value = window.innerWidth < 768 ? '95%' : '640px' }
+const searchQuery = ref('')
 const roleFilter = ref('all')
 const filtered = computed(() => {
   let list = currentFolder.value === null ? projects.value : projects.value.filter(p => p.folderId === currentFolder.value)
   if (roleFilter.value === 'owner') list = list.filter(p => p.isOwner)
   else if (roleFilter.value === 'admin') list = list.filter(p => !p.isOwner && p.permission === 'ADMIN')
   else if (roleFilter.value === 'read') list = list.filter(p => !p.isOwner && p.permission === 'READ')
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    list = list.filter(p => p.title.toLowerCase().includes(q))
+  }
   return list
 })
 
@@ -289,8 +299,16 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 
 /* Main */
 .main { flex: 1; padding: 24px }
-.main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px }
-.main-header h2 { font-size: 22px; font-weight: 800; color: var(--c-gold); margin: 0; font-family: var(--font-serif) }
+.main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; flex-wrap: wrap }
+.main-header h2 { font-size: 22px; font-weight: 800; color: var(--c-gold); margin: 0; font-family: var(--font-serif); flex-shrink: 0 }
+.header-right { display: flex; align-items: center; gap: 10px }
+.search-input { width: 200px }
+.search-input :deep(.el-input__wrapper) {
+  background: var(--color-surface); border-color: var(--color-border);
+  border-radius: 20px; box-shadow: none
+}
+.search-input :deep(.el-input__wrapper:hover) { border-color: var(--c-gold) }
+.search-input :deep(.el-input__wrapper.is-focus) { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) inset }
 
 .role-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap }
 .rf-btn {
