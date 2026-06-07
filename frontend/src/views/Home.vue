@@ -14,7 +14,7 @@
         <h1 class="title">剧本工坊</h1>
         <p class="slogan">从文字到银幕，只差一个回车</p>
         <p class="hero-desc">
-          粘贴小说 → AI 7 级分章提取角色 → 实时生成结构化剧本<br/>
+          上传或粘贴小说 → AI 7 级分章提取角色 → 实时生成结构化剧本<br/>
           混元人种感知生图 · 邀请链接多人协作 · COS 云端存储
         </p>
         <div class="hero-actions">
@@ -31,7 +31,7 @@
           <span class="f-badge">.docx</span>
           <span class="f-badge">📋 粘贴</span>
         </div>
-        <p class="format-hint">支持 TXT / EPUB / DOCX 文件上传或直接粘贴原文</p>
+        <p class="format-hint">上传 TXT / EPUB / DOCX 或直接粘贴原文，导出 YAML / MD / Fountain / TXT / DOCX / HTML</p>
         <div class="hero-stats">
           <div class="stat"><strong>7级</strong><span>智能分章</span></div>
           <div class="stat"><strong>8类</strong><span>人种生图</span></div>
@@ -81,9 +81,9 @@
           <p>YAML · Markdown · Fountain · TXT · DOCX · HTML，一键下载 + 在线预览</p>
         </div>
         <div class="feat-card">
-          <div class="feat-icon">🛡️</div>
-          <h3>安全限流</h3>
-          <p>JWT 无状态鉴权 · 6 级令牌桶限流 · 生图/导出端点强制认证 · BCrypt 密码加密</p>
+          <div class="feat-icon">☁️</div>
+          <h3>云端存储与容错</h3>
+          <p>COS 云端永久存储生图，失败自动熔断重试，图片版本历史可回滚，重启不丢数据</p>
         </div>
       </div>
     </section>
