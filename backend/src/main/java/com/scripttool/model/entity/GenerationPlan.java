@@ -159,11 +159,18 @@ public class GenerationPlan {
     public void appendScenes(List<Map<String, Object>> newScenes) {
         List<Map<String, Object>> existing = getAccumulatedScenes();
         existing.addAll(newScenes);
-        // Re-number scenes sequentially
         for (int i = 0; i < existing.size(); i++) {
             existing.get(i).put("scene_number", i + 1);
         }
         this.scenesJson = toJson(existing);
+    }
+
+    /** Replace all scenes (used during onChunk incremental updates) */
+    public void setAccumulatedScenes(List<Map<String, Object>> scenes) {
+        for (int i = 0; i < scenes.size(); i++) {
+            scenes.get(i).put("scene_number", i + 1);
+        }
+        this.scenesJson = toJson(scenes);
     }
 
     // ── Data for SSE ──

@@ -177,8 +177,11 @@ public class ScriptService {
                     oldPartialYaml = null;
                 }
 
+                // Capture plan as effectively-final for lambda use
+                final GenerationPlan fplan = plan;
+
                 // ── ⑤ Find start point ──
-                int startChapter = plan.getCompletedChapters(); // 0 if fresh, N if resuming
+                int startChapter = fplan.getCompletedChapters(); // 0 if fresh, N if resuming
                 if (startChapter > 0) {
                     send(emitter, "progress", data("step", "resume", "message",
                         "断点续传: " + startChapter + "/" + total + " 章已完成，"
@@ -199,12 +202,12 @@ public class ScriptService {
                 // ── ⑥ Execute chapter by chapter ──
                 for (int i = startChapter; i < total; i++) {
                     final int chapterIdx = i;
+                    final int chapterNum = i + 1;
                     ChapterSplitService.ChapterResult ch = chapters.get(i);
-                    int chapterNum = i + 1;
 
                     // Mark IN_PROGRESS
-                    plan.markInProgress(chapterIdx);
-                    planRepo.save(plan);
+                    fplan.markInProgress(chapterIdx);
+                    planRepo.save(fplan);
                     send(emitter, "chapter_start", data(
                         "chapter", chapterNum,
                         "title", ch.title(),
@@ -214,9 +217,12 @@ public class ScriptService {
                     ));
 
                     // Generate script for this ONE chapter
+                    // onChunk fires per ~1000-char chunk → push intermediate YAML for real-time preview
                     ScriptGenService.ScriptResult r;
                     try {
-                        final int fi = chapterIdx; // effectively final for lambda
+                        final int fi = chapterIdx;
+                        final String oldYaml = oldPartialYaml;
+                        final int sceneCountBeforeChapter = fplan.getAccumulatedScenes().size();
                         r = scriptGenService.generate(
                             project.getOriginalText(),
                             List.of(ch),
@@ -227,19 +233,51 @@ public class ScriptService {
                                     "done", d, "total", t, "chapter", chapterNum
                                 ));
                             },
-                            null // We handle YAML generation ourselves, not via callback
+                            (chars, scenes, d, t) -> {
+                                // onChunk gives accumulated chars+scenes for this chapter so far.
+                                // Trim chapter's scenes then re-add to avoid duplicates.
+                                fplan.mergeCharacters(chars);
+                                List<Map<String, Object>> curScenes = fplan.getAccumulatedScenes();
+                                while (curScenes.size() > sceneCountBeforeChapter)
+                                    curScenes.remove(curScenes.size() - 1);
+                                for (var s : scenes) s.putIfAbsent("chapter", chapterNum);
+                                curScenes.addAll(scenes);
+                                fplan.setAccumulatedScenes(curScenes);
+
+                                String chunkYaml = yamlGeneratorService.generate(
+                                    project.getTitle(), "原著小说", authorName,
+                                    fplan.getAccumulatedCharacters(), curScenes);
+                                if (oldYaml != null && !oldYaml.isBlank()) {
+                                    chunkYaml = mergeYaml(oldYaml, chunkYaml);
+                                }
+                                fplan.setPartialYaml(chunkYaml);
+                                planRepo.save(fplan);
+
+                                int pct = (int)((double)(fi + (d > 0 ? (double)d / t : 0)) / total * 100);
+                                send(emitter, "chapter_done", data(
+                                    "yamlContent", chunkYaml,
+                                    "chapter", chapterNum,
+                                    "totalChapters", total,
+                                    "completedChapters", fplan.getCompletedChapters(),
+                                    "charCount", chars.size(),
+                                    "sceneCount", scenes.size(),
+                                    "percent", pct,
+                                    "chapters", fplan.getChapterTasks(),
+                                    "interim", true
+                                ));
+                            }
                         );
                     } catch (Exception ex) {
                         log.error("Chapter {} generation failed", chapterNum, ex);
-                        plan.getChapterTasks().get(i).put("status", "FAILED");
-                        planRepo.save(plan);
+                        fplan.getChapterTasks().get(i).put("status", "FAILED");
+                        planRepo.save(fplan);
                         send(emitter, "error", "第" + chapterNum + "章生成失败: " + ex.getMessage());
                         emitter.complete();
                         return;
                     }
 
                     // Merge characters
-                    plan.mergeCharacters(r.characters());
+                    fplan.mergeCharacters(r.characters());
 
                     // Merge scenes (chapter-aware)
                     for (var s : r.scenes()) {
@@ -250,23 +288,23 @@ public class ScriptService {
                     // Build accumulated YAML
                     String accumulatedYaml = yamlGeneratorService.generate(
                         project.getTitle(), "原著小说", authorName,
-                        plan.getAccumulatedCharacters(), plan.getAccumulatedScenes());
+                        fplan.getAccumulatedCharacters(), fplan.getAccumulatedScenes());
 
                     // Merge with old partial YAML if resuming
                     if (oldPartialYaml != null && !oldPartialYaml.isBlank()) {
                         accumulatedYaml = mergeYaml(oldPartialYaml, accumulatedYaml);
                     }
 
-                    plan.setPartialYaml(accumulatedYaml);
+                    fplan.setPartialYaml(accumulatedYaml);
                     plan.markDone(i, r.scenes().size(), r.characters().size());
-                    planRepo.save(plan);
+                    planRepo.save(fplan);
 
                     // Save ScriptVersion snapshot
                     ScriptVersion sv = projectService.saveScriptVersion(projectId, accumulatedYaml);
 
                     // ── Incremental scene image generation ──
                     if (r.scenes() != null && !r.scenes().isEmpty()) {
-                        List<Map<String, Object>> allScenes = plan.getAccumulatedScenes();
+                        List<Map<String, Object>> allScenes = fplan.getAccumulatedScenes();
                         for (int si = 0; si < allScenes.size(); si++) {
                             final int sceneIdx = si;
                             if (!imgGenDispatched.contains(sceneIdx)) {
@@ -301,17 +339,17 @@ public class ScriptService {
                         "versionNumber", sv.getVersionNumber(),
                         "chapter", chapterNum,
                         "totalChapters", total,
-                        "completedChapters", plan.getCompletedChapters(),
+                        "completedChapters", fplan.getCompletedChapters(),
                         "charCount", r.characters().size(),
                         "sceneCount", r.scenes().size(),
                         "percent", pct,
-                        "chapters", plan.getChapterTasks()
+                        "chapters", fplan.getChapterTasks()
                     ));
                 }
 
                 // ── ⑦ Finalize ──
-                List<Map<String, Object>> finalChars = plan.getAccumulatedCharacters();
-                List<Map<String, Object>> finalScenes = plan.getAccumulatedScenes();
+                List<Map<String, Object>> finalChars = fplan.getAccumulatedCharacters();
+                List<Map<String, Object>> finalScenes = fplan.getAccumulatedScenes();
 
                 String finalYaml = yamlGeneratorService.generate(
                     project.getTitle(), "原著小说", authorName, finalChars, finalScenes);
@@ -326,7 +364,7 @@ public class ScriptService {
 
                 send(emitter, "done", data(
                     "yamlContent", finalYaml,
-                    "versionNumber", plan.getVersionNumber(),
+                    "versionNumber", fplan.getVersionNumber(),
                     "charCount", finalChars.size(),
                     "sceneCount", finalScenes.size(),
                     "totalChapters", total,
