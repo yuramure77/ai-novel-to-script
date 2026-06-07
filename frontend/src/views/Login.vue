@@ -100,6 +100,11 @@ async function register() {
 .tabs :deep(.el-tabs__item.is-active) { color: var(--c-gold); font-weight: 700; }
 .tabs :deep(.el-tabs__active-bar) { background: var(--c-gold); height: 3px; border-radius: 2px; }
 .tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background: var(--color-border); }
+.login-card :deep(.el-input__wrapper) {
+  background: var(--color-bg); border-color: var(--color-border); box-shadow: none;
+}
+.login-card :deep(.el-input__wrapper:hover) { border-color: var(--c-gold); }
+.login-card :deep(.el-input__wrapper.is-focus) { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold) inset; }
 .back-home { text-align: center; margin-top: 20px; }
 .back-home a { color: var(--color-text-muted); font-size: 12px; text-decoration: none; }
 .back-home a:hover { color: var(--c-gold); }
@@ -115,4 +120,17 @@ async function register() {
   .clapper { font-size: 36px; }
   .film-strip { display: none; }
 }
+</style>
+
+<style>
+/* Override Element Plus tabs default blue → gold (global, higher specificity than scoped :deep) */
+.login-page .el-tabs__item { color: #b8a88a !important; font-size: 16px !important; font-weight: 600 !important; }
+.login-page .el-tabs__item:hover { color: #d4a853 !important; }
+.login-page .el-tabs__item.is-active { color: #d4a853 !important; font-weight: 700 !important; }
+.login-page .el-tabs__active-bar { background-color: #d4a853 !important; height: 3px !important; }
+.login-page .el-tabs__nav-wrap::after { background-color: #3a3020 !important; height: 1px !important; }
+/* Input golden theme */
+.login-page .el-input__wrapper { box-shadow: none !important; }
+.login-page .el-input__wrapper:hover { border-color: #d4a853 !important; }
+.login-page .el-input.is-focus .el-input__wrapper { border-color: #d4a853 !important; box-shadow: 0 0 0 1px #d4a853 inset !important; }
 </style>
