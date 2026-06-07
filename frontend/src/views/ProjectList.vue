@@ -79,8 +79,8 @@
             <div class="card-inner">
               <div class="card-head">
                 <h3>{{ p.title }}</h3>
-                <el-tag v-if="!(p.isOwner || p.ownerId === userId)" size="small" round :type="(p.permission||'READ')==='ADMIN'?'warning':'info'">
-                  {{ (p.permission||'READ')==='ADMIN'?'🔧 管理员':'👁 只读' }}
+                <el-tag size="small" round :type="(p.isOwner || p.ownerId === userId || (p.permission||'READ')==='ADMIN')?'warning':'info'">
+                  {{ (p.isOwner || p.ownerId === userId) ? '👑 创建者' : (p.permission||'READ')==='ADMIN'?'🔧 管理员':'👁 只读' }}
                 </el-tag>
               </div>
               <div class="card-info">
