@@ -4,6 +4,8 @@
 
 📺 **[Demo 演示视频 — Bilibili](https://www.bilibili.com/video/BV1fvEt6oEZJ/)**
 
+🌐 **在线体验：http://118.25.85.229**
+
 [![CI](https://github.com/yuramure77/ai-novel-to-script/actions/workflows/ci.yml/badge.svg)](https://github.com/yuramure77/ai-novel-to-script/actions/workflows/ci.yml)
 
 ---
