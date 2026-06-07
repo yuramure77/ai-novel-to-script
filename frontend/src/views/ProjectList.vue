@@ -380,7 +380,7 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
   .main { padding: 16px 12px; }
   .main-header h2 { font-size: 18px; }
   .grid { grid-template-columns: 1fr; }
-  .card-hover { opacity: 1; }
+  .card-hover { opacity: 1; top: 10px; bottom: auto; }
   .card:hover .card-hover { opacity: 1; }
 }
 </style>
