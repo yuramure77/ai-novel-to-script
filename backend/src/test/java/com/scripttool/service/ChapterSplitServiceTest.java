@@ -10,52 +10,50 @@ class ChapterSplitServiceTest {
 
     private final ChapterSplitService service = new ChapterSplitService();
 
-    String lorem = "这是一段用于填充章节内容的长文本它包含了丰富的描写和细节确保每个章节之间有足够的字符数量来通过分章算法的最小间距验证";
+    private String body() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++)
+            sb.append("这是一段用于填充章节内容的长文本它包含了丰富的描写和细节。");
+        return sb.toString();
+    }
 
-    @Test
-    @DisplayName("中文第X章识别")
+    @Test @DisplayName("中文第X章 — 3章识别")
     void chineseChapters() {
-        String ch1 = lorem.repeat(3) + "松枝清显站在窗前望着纷飞的雪花心中涌起难以名状的情愫";
-        String ch2 = lorem.repeat(3) + "本多繁邦推门进来带着一股寒气眼镜片上蒙着薄薄的水雾";
-        String text = "第一章 春雪\n\n" + ch1 + "\n\n第二章 青梅竹马\n\n" + ch2;
+        String text = "第一章 春雪\n\n" + body() + "\n\n第二章 青梅竹马\n\n" + body()
+            + "\n\n第三章 离别\n\n" + body();
         List<ChapterSplitService.ChapterResult> chapters = service.split(text);
-        assertTrue(chapters.size() >= 2, "应识别2章, 实际:" + chapters.size());
+        assertTrue(chapters.size() >= 3, "应识别3章, 实际:" + chapters.size());
     }
 
-    @Test
-    @DisplayName("第X部/篇识别")
+    @Test @DisplayName("第X部 — 3部识别")
     void sectionMarkers() {
-        String p1 = lorem.repeat(3) + "明治四十五年的春天松枝清显还是一个十二岁的少年";
-        String p2 = lorem.repeat(3) + "十六岁的清显已经长成了让所有人惊叹的美少年";
-        String text = "第一部 少年时代\n\n" + p1 + "\n\n第二部 青春之门\n\n" + p2;
+        String text = "第一部 少年时代\n\n" + body() + "\n\n第二部 青春之门\n\n" + body()
+            + "\n\n第三部 命运\n\n" + body();
         List<ChapterSplitService.ChapterResult> chapters = service.split(text);
-        assertTrue(chapters.size() >= 2, "应识别2部, 实际:" + chapters.size());
+        assertTrue(chapters.size() >= 3, "应识别3部, 实际:" + chapters.size());
     }
 
-    @Test
-    @DisplayName("fallback无章节长文本自动分块")
+    @Test @DisplayName("fallback无章节长文本分块")
     void fallbackLongText() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 100; i++)
-            sb.append("小说内容段落").append(i+1).append("。").append(lorem).append("\n\n");
+        for (int i = 0; i < 150; i++)
+            sb.append("段落").append(i+1).append("内容描写。").append(body()).append("\n\n");
         List<ChapterSplitService.ChapterResult> chapters = service.split(sb.toString());
         assertTrue(chapters.size() >= 3, "长文本应分块, 实际:" + chapters.size());
     }
 
-    @Test
-    @DisplayName("空文本/null安全")
+    @Test @DisplayName("空文本/null安全")
     void nullSafe() {
         assertNotNull(service.split(""));
         assertNotNull(service.split(null));
     }
 
-    @Test
-    @DisplayName("每章标题/内容非空")
-    void chaptersHaveTitle() {
-        String c = lorem.repeat(5);
-        String text = "第一章 开端\n\n" + c + "\n\n第二章 展开\n\n" + c + "\n\n第三章 结局\n\n" + c;
+    @Test @DisplayName("每章标题和内容非空")
+    void chaptersHaveContent() {
+        String text = "第一章 A\n\n" + body() + "\n\n第二章 B\n\n" + body()
+            + "\n\n第三章 C\n\n" + body();
         List<ChapterSplitService.ChapterResult> chapters = service.split(text);
-        assertTrue(chapters.size() >= 3, "应识别3章, 实际:" + chapters.size());
+        assertFalse(chapters.isEmpty());
         chapters.forEach(ch -> {
             assertNotNull(ch.title());
             assertFalse(ch.content().isBlank());

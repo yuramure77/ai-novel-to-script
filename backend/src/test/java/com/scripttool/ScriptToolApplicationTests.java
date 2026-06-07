@@ -16,7 +16,7 @@ class ScriptToolApplicationTests {
 
     @Autowired private MockMvc mockMvc;
 
-    @Test @DisplayName("上下文加载成功")
+    @Test @DisplayName("Spring上下文加载")
     void contextLoads() {}
 
     @Test @DisplayName("Actuator健康检查")
@@ -26,15 +26,15 @@ class ScriptToolApplicationTests {
             .andExpect(jsonPath("$.status").value("UP"));
     }
 
-    @Test @DisplayName("API认证接口可访问")
-    void authEndpointsAccessible() throws Exception {
-        mockMvc.perform(get("/actuator/info"))
-            .andExpect(status().isOk());
-    }
-
-    @Test @DisplayName("未认证请求被拦截")
+    @Test @DisplayName("API认证拦截")
     void unauthenticatedBlocked() throws Exception {
         mockMvc.perform(get("/api/projects"))
             .andExpect(status().isForbidden());
+    }
+
+    @Test @DisplayName("登录接口可访问")
+    void authEndpointAccessible() throws Exception {
+        mockMvc.perform(get("/api/auth/login"))
+            .andExpect(status().is(405)); // POST only, but endpoint exists
     }
 }
