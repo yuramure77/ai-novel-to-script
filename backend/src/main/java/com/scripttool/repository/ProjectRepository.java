@@ -9,4 +9,5 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     List<Project> findByUserIdOrderByUpdatedAtDesc(Long userId);
     long countByUserId(Long userId);
     Optional<Project> findByInviteToken(String inviteToken);
+    boolean existsByUserIdAndTitle(Long userId, String title);
 }

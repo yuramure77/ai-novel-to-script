@@ -59,6 +59,9 @@ public class ProjectService {
 
     @Transactional
     public Project createProject(Long userId, String title, String originalText) {
+        if (projectRepository.existsByUserIdAndTitle(userId, title)) {
+            throw new RuntimeException("项目名称「" + title + "」已存在，请换个名字");
+        }
         return projectRepository.save(new Project(userId, title, originalText));
     }
 
