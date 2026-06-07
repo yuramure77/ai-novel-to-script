@@ -10,29 +10,31 @@
 
 ### 📖 智能剧本生成
 - **7 级分章策略** — 中文第X章 → 英文Chapter → 第X部/篇/卷 → 罗马数字 → 日语数字 → 编号分隔 → 段落智能分块，覆盖中日英小说格式
-- **无章节回退** — 如《雪国》等无章节小说，自动按段落密度切分，标题为「第N部分」，不抄原文
+- **无章节回退** — 如《雪国》等无章节小说，自动按段落密度切分，标题为「第N部分」
 - **AI 角色提取** — DeepSeek 自动识别角色名、身份、性格特征、人物关系
-- **逐章场景生成** — 每个章节独立生成场景 beats（对白、动作、氛围、地点、时辰）
-- **SSE 流式输出** — 实时显示生成进度，支持断点续传
-- **1000字块号检查点** — 文本按千字分块，位图标记进度（1=已完成 0=待处理），中断自动从断点续写，已完成块直接跳过
+- **任务制断点续传** — 分章后创建 `GenerationPlan` 持久化到数据库，每章独立任务（PENDING→IN_PROGRESS→DONE），中断后从第一个未完成章节继续
+- **SSE 流式输出** — 实时显示生成进度，支持断点续写和即时预览
+- **onChunk 实时推送** — 每 1000 字块完成后立即推送中间 YAML，用户不必等整章完成就能看到内容
+- **章节级进度条** — 前端显示 `第X章/共N章` + 章节状态标记（✅已完成 / 🔄生成中 / ⬜待处理）
 - **100万字上限** — 支持超长篇小说全文处理
 - **剧本版本管理** — 每次生成独立保存版本号，历史回溯对比，可编辑保存
 
 ### 🎨 AI 图像生成
 - **混元 hy-image-lite** — 腾讯混元大模型图生，TokenHub API
-- **DeepSeek 丰富描写** — 先生成个性化外貌/场景描写，再送入混元生图
-- **年龄智能识别** — 自动检测角色年龄阶段，祖母不会生成年轻形象
-- **反同质化** — 性格→视觉元素转化（如「孤傲」→冷峻神情），角色不撞脸
+- **DeepSeek 造型师** — 先生成个性化外貌/场景描写（含年龄智能识别、性格→视觉元素转化），再送入混元生图
+- **反同质化** — 每个角色有独特外貌特征，避免千篇一律的「剑眉星目」「面如冠玉」
 - **COS 永久存储** — 生成图片自动上传腾讯云 COS，获得永久 URL
 - **图片版本历史** — 每次生图自动存档，支持回滚切换
-- **场景图画廊** — 16:9 卡片网格 + 批量一键生成所有场景图 + 悬停放大预览
+- **场景图渐进式生成** — 后台 4 线程池异步生成，完成即通过 SSE `scene_image` 事件实时推送到前端画廊
+- **熔断保护** — 连续失败 5 次自动暂停 60 秒，避免浪费 DeepSeek 提示词配额
+- **并发限制重试** — TokenHub 付费版单任务上限，`JobNumExceed` 自动等待 3 秒重试
+- **图片持久化** — YAML 重新解析时自动保留已有图片，不会闪烁丢失
 - **图片下载** — 预览弹窗一键下载原图
 
 ### 👥 多人协作
 - **项目分享** — 通过用户名添加协作者
 - **权限分级** — 管理员（可编辑/生成/管理协作者）vs 只读（仅查看）
 - **权限标签** — 项目列表显示「🔧 协管」「👁 只读」标识
-- **只读模式保护** — 只读用户隐藏编辑/生成按钮，禁用快捷键
 
 ### 📄 多格式导出
 - **YAML** — 结构化剧本原始格式
@@ -45,9 +47,8 @@
 - **毛玻璃材质** — 弹窗、侧栏标题均采用 backdrop-filter 毛玻璃效果 + 金色描边
 - **可拖拽面板** — 原文/剧本/AI助手三栏宽度可通过金色手柄自由拖拽调整
 - **全局快捷键** — Ctrl+F 搜索原文、Ctrl+Enter 生成剧本、Ctrl+S 保存 YAML、Esc 关闭搜索
-- **金色视觉系统** — 所有操作按钮统一为金色（warning 色系），章节 Pills 渐变金色 + hover 发光
+- **金色视觉系统** — 所有操作按钮统一为金色，章节 Pills 渐变金色 + hover 发光
 - **响应式适配** — 手机端完整适配，弹窗宽度自适、表单移动端布局优化
-- **聚光灯动画** — 新建项目按钮流光动画引导用户操作
 
 ### 🔧 DevOps
 - **GitHub Actions CI** — push 自动编译后端（Maven）+ 前端（Vite）
@@ -134,27 +135,32 @@ npm run dev
                    (文本生成)         (AI 图像生成)       (图片持久化)
 ```
 
-### 核心流程
+### 剧本生成流程（任务制断点续传）
 
 ```
-小说文本 (粘贴/上传)
+点击生成剧本
     │
     ▼
- 分章服务 (ChapterSplitService)
-  正则匹配"第X章" / "Chapter X"
+① 分章 (ChapterSplitService) — 7级策略
     │
     ▼
- DeepSeek AI 分析 (ScriptGenService)
-  ├─ 第一步: 全文提取角色信息
-  └─ 第二步: 逐章生成场景 beats
+② 创建 GenerationPlan — 持久化到 DB
+   每章一个任务: {num, title, status: PENDING}
+   推送 plan SSE 事件 → 前端显示章节进度条
     │
     ▼
- YAML 生成 (YamlGeneratorService)
-  SnakeYAML 组装输出
+③ 逐章执行 (逐章调用 ScriptGenService)
+   标记 IN_PROGRESS → DeepSeek 生成 → 标记 DONE
+   onChunk 回调: 每1000字块推送中间YAML
+   累积角色/场景到 GenerationPlan JSON
     │
     ▼
- 版本存储 (H2 数据库)
-  script_versions 表
+④ YAML 生成 (YamlGeneratorService)
+   SnakeYAML 组装，保存 ScriptVersion
+    │
+    ▼
+⑤ 断点续传: 中断后重连 → 查 DB GenerationPlan
+   → 找到 DONE 章节 → 重建 YAML → 续写 PENDING
 ```
 
 ### 生图流程
@@ -163,13 +169,20 @@ npm run dev
 角色/场景数据
     │
     ▼
- DeepSeek 造型师 → 个性化外貌描写（含年龄/性格→视觉）
+① DeepSeek 造型师 → 个性化外貌/场景描写
+   （年龄识别 + 性别检测 + 性格→视觉转化）
     │
     ▼
- 混元 hy-image-lite → AI 生成图片
+② 混元 hy-image-lite → TokenHub API
+   线程池(1线程) → 熔断保护(5次失败暂停60s)
+   JobNumExceed → 自动等待3秒重试
     │
     ▼
- COS 上传 → 永久 URL → image_versions 表
+③ COS 上传 → 永久 URL → image_versions 表
+    │
+    ▼
+④ SSE scene_image 事件 → 前端实时更新画廊
+   YAML重新解析时自动保留已有图片
 ```
 
 ---
@@ -195,7 +208,7 @@ npm run dev
 | DELETE | `/api/projects/{id}` | 删除（需 ADMIN） |
 | POST | `/api/projects/{id}/split` | 分章预览 |
 | POST | `/api/projects/{id}/generate` | AI 生成剧本 |
-| GET | `/api/projects/{id}/generate/stream` | SSE 流式生成 |
+| GET | `/api/projects/{id}/generate/stream` | SSE 流式生成（事件: plan/chapter_start/chapter_done/scene_image/done） |
 
 ### 协作接口（需 Bearer Token）
 
@@ -282,15 +295,18 @@ npm run dev
 | user_id | BIGINT FK | 用户 |
 | permission | VARCHAR(20) | ADMIN/READ |
 
-### generation_progress（生成检查点）
+### generation_plan（生成计划 — 任务制断点续传）
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | BIGINT PK | 主键 |
 | project_id | BIGINT FK UNIQUE | 项目 |
-| total_chunks | INT | 总块数（1000字/块） |
-| chunk_map | VARCHAR(10000) | 位图（1=已完成, 0=待处理） |
-| partial_yaml | CLOB | 累积的部分 YAML |
+| total_chapters | INT | 总章数 |
+| completed_chapters | INT | 已完成章数 |
 | version_number | INT | 对应版本号 |
+| chapters_json | CLOB | 章节任务列表 JSON（含 PENDING/IN_PROGRESS/DONE 状态） |
+| partial_yaml | CLOB | 累积的部分 YAML |
+| characters_json | CLOB | 累积的角色 JSON |
+| scenes_json | CLOB | 累积的场景 JSON |
 | updated_at | TIMESTAMP | 更新时间 |
 
 ### image_versions
@@ -300,7 +316,7 @@ npm run dev
 | project_id | BIGINT FK | 项目 |
 | image_type | VARCHAR(20) | CHARACTER/SCENE |
 | target_index | INT | 角色/场景序号 |
-| url | VARCHAR(1024) | 图片 URL |
+| url | VARCHAR(1024) | 图片 URL (COS 永久链接) |
 | prompt | VARCHAR(1024) | 生成提示词 |
 | created_at | TIMESTAMP | 时间 |
 
@@ -352,6 +368,16 @@ sudo systemctl restart novel-script   # 重启
 curl http://localhost:8080/actuator/health  # 健康检查
 ```
 
+### 日志过滤
+
+```bash
+# 查看生图链路日志
+journalctl -u novel-script -f --no-pager 2>&1 | grep --line-buffered '生图'
+
+# 查看生成进度
+journalctl -u novel-script -f --no-pager 2>&1 | grep --line-buffered 'chapter\|plan\|done'
+```
+
 ---
 
 ## 📁 项目结构
@@ -364,10 +390,10 @@ ai-novel-to-script/
 │   └── src/main/java/com/scripttool/
 │       ├── config/                    # JWT, Security, DeepSeek, COS
 │       ├── controller/                # Auth, Project, Script, AI, Export, Chat, File, Folder, Deploy, Collaboration
-│       ├── model/entity/              # User, Project, ScriptVersion, Folder, Collaboration, ImageVersion
+│       ├── model/entity/              # User, Project, ScriptVersion, Folder, Collaboration, GenerationPlan, ImageVersion
 │       ├── model/dto/                 # ApiResponse, ProjectResponse 等
 │       ├── repository/                # JPA Repository 接口
-│       └── service/                   # ChapterSplit, ScriptGen, Image, COS, Collaboration 等
+│       └── service/                   # ChapterSplit, ScriptGen, ScriptService, Image, COS, Collaboration 等
 ├── frontend/                          # Vue 3 前端
 │   └── src/
 │       ├── api/                       # Axios API 封装
