@@ -144,4 +144,38 @@ async function doRemove(collabId) {
 .online-dot, .offline-dot { font-size: 8px }
 .offline-dot { opacity: 0.3 }
 .collab-actions { display: flex; align-items: center; gap: 8px }
+
+/* Frosted glass dialog — match create project style */
+:deep(.el-overlay-dialog) {
+  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  background: var(--overlay-glass-bg, rgba(0,0,0,0.12)) !important;
+  backdrop-filter: var(--overlay-glass-blur, blur(4px));
+  -webkit-backdrop-filter: var(--overlay-glass-blur, blur(4px));
+}
+:deep(.el-dialog) {
+  background: var(--dialog-glass-bg, rgba(20,16,10,0.3)) !important;
+  backdrop-filter: var(--dialog-glass-blur, blur(50px) saturate(150%));
+  -webkit-backdrop-filter: var(--dialog-glass-blur, blur(50px) saturate(150%));
+  border: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.08)) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--dialog-glass-shadow) !important;
+  overflow: hidden;
+}
+:deep(.el-dialog__header) {
+  background: transparent !important;
+  border-bottom: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.06));
+}
+:deep(.el-dialog__footer) {
+  background: transparent !important;
+  border-top: 0.5px solid var(--dialog-glass-border, rgba(255,255,255,0.06));
+}
+:deep(.el-input__wrapper) {
+  background: var(--color-bg-alt, rgba(255,255,255,0.04));
+  border-color: var(--color-border, rgba(255,255,255,0.1));
+  box-shadow: none;
+}
+:deep(.el-select .el-input__wrapper) {
+  background: var(--color-bg-alt, rgba(255,255,255,0.04));
+}
 </style>
