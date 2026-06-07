@@ -1,5 +1,6 @@
 package com.scripttool.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.scripttool.model.entity.Project;
 import java.time.LocalDateTime;
 
@@ -9,8 +10,10 @@ public class ProjectResponse {
     private Long folderId;
     private Integer chapterCount;
     private String status;
+    @JsonProperty("isOwner")
     private boolean isOwner;
     private String permission;
+    @JsonProperty("ownerId")
     private Long ownerId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
