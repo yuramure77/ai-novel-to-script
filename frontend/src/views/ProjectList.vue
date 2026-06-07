@@ -294,17 +294,25 @@ function fmt(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '' }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px }
 .card {
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  overflow: hidden; cursor: pointer; transition: all var(--transition); position: relative
+  overflow: hidden; cursor: pointer; transition: all var(--transition); position: relative;
+  display: flex; flex-direction: column
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--c-gold) }
-.card-top-bar { height: 3px }
+.card-top-bar { height: 3px; flex-shrink: 0 }
 .card-top-bar.completed { background: var(--color-success) }
 .card-top-bar.processing { background: var(--color-warning) }
 .card-top-bar.draft { background: var(--c-gold) }
-.card-inner { padding: 14px 18px }
-.card-head { display: flex; justify-content: space-between; align-items: center }
-.card-head h3 { font-size: 15px; color: var(--color-text); margin: 0; font-weight: 600 }
-.card-info { display: flex; justify-content: space-between; color: var(--color-text-muted); font-size: 12px; margin-top: 10px }
+.card-inner { padding: 14px 18px; flex: 1; display: flex; flex-direction: column }
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 44px }
+.card-head h3 {
+  font-size: 15px; color: var(--color-text); margin: 0; font-weight: 600;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word
+}
+.card-head .el-tag { flex-shrink: 0; margin-top: 1px }
+.card-info {
+  display: flex; justify-content: space-between; align-items: center;
+  color: var(--color-text-muted); font-size: 12px; margin-top: auto; padding-top: 12px
+}
 .card-hover { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity var(--transition) }
 .card:hover .card-hover { opacity: 1 }
 
