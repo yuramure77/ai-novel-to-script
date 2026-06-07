@@ -14,8 +14,8 @@
         <h1 class="title">剧本工坊</h1>
         <p class="slogan">从文字到银幕，只差一个回车</p>
         <p class="hero-desc">
-          粘贴小说 → AI 自动分章提取角色 → 实时生成结构化剧本<br/>
-          混元 AI 生成角色形象与场景图 · 邀请链接多人协作
+          粘贴小说 → AI 7 级分章提取角色 → 实时生成结构化剧本<br/>
+          混元人种感知生图 · 邀请链接多人协作 · COS 云端存储
         </p>
         <div class="hero-actions">
           <button class="btn-primary" @click="startCreating">
@@ -34,9 +34,9 @@
         <p class="format-hint">支持 TXT / EPUB / DOCX 文件上传或直接粘贴原文</p>
         <div class="hero-stats">
           <div class="stat"><strong>7级</strong><span>智能分章</span></div>
-          <div class="stat"><strong>SSE</strong><span>流式生成</span></div>
-          <div class="stat"><strong>断点</strong><span>任务续传</span></div>
-          <div class="stat"><strong>4格式</strong><span>多端导出</span></div>
+          <div class="stat"><strong>8类</strong><span>人种生图</span></div>
+          <div class="stat"><strong>44+</strong><span>API 端点</span></div>
+          <div class="stat"><strong>6格式</strong><span>多端导出</span></div>
         </div>
       </div>
     </section>
@@ -48,42 +48,42 @@
         <div class="feat-card">
           <div class="feat-icon">📖</div>
           <h3>7 级智能分章</h3>
-          <p>中文·英文·罗马数字·日文·编号·分隔线·段落智能回退，覆盖中日英小说格式</p>
+          <p>中文·英文·罗马·日文·编号·分隔线·段落回退，覆盖中日英格式，100万字上限</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon">🤖</div>
           <h3>AI 剧本生成</h3>
-          <p>DeepSeek 大模型逐章分析，自动提取角色性格、场景 Beats、对白与动作指导</p>
-        </div>
-        <div class="feat-card">
-          <div class="feat-icon">⚡</div>
-          <h3>断点续传</h3>
-          <p>GenerationPlan 任务制持久化，中断后自动从断点续写，已完成章节秒级恢复</p>
+          <p>DeepSeek 大模型逐章分析，SSE 流式推送，任务制持久化断点续传</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon">🖼️</div>
-          <h3>AI 角色生图</h3>
-          <p>DeepSeek 造型师 + 混元 hy-image-lite，年龄性别智能识别，反同质化提示词</p>
+          <h3>人种感知生图</h3>
+          <p>东亚/欧美/中东等 8 类人种识别，9 维造型维度，混元生图 + COS 永久存储</p>
         </div>
         <div class="feat-card">
-          <div class="feat-icon">🎥</div>
-          <h3>场景图渐进生成</h3>
-          <p>剧本生成同时后台生成场景图，SSE 实时推送，完成即出现在画廊</p>
+          <div class="feat-icon">🔍</div>
+          <h3>搜索与筛选</h3>
+          <p>标题模糊搜索，角色四档筛选（创建者/管理员/只读），金色胶囊按钮</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">✅</div>
+          <h3>批量管理</h3>
+          <p>多选项目一键批量删除或移动文件夹，文件夹自定义颜色分组</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon">👥</div>
           <h3>多人协作</h3>
-          <p>邀请链接一键分享，管理员/只读权限，在线用户实时感知，三层安全防护</p>
+          <p>邀请链接一键加入，管理员/只读权限，在线状态实时感知，API 双重校验</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon">📄</div>
-          <h3>多格式导出</h3>
-          <p>YAML 结构化 · Markdown 阅读 · Fountain 剧本 · TXT 纯文本，一键下载</p>
+          <h3>6 格式导出</h3>
+          <p>YAML · Markdown · Fountain · TXT · DOCX · HTML，一键下载 + 在线预览</p>
         </div>
         <div class="feat-card">
-          <div class="feat-icon">🎨</div>
-          <h3>沉浸式体验</h3>
-          <p>暗色/亮色双主题 · 毛玻璃弹窗 · 可拖拽面板 · 全局快捷键 · 图片版本回滚</p>
+          <div class="feat-icon">🛡️</div>
+          <h3>安全限流</h3>
+          <p>JWT 无状态鉴权 · 6 级令牌桶限流 · 生图/导出端点强制认证 · BCrypt 密码加密</p>
         </div>
       </div>
     </section>
