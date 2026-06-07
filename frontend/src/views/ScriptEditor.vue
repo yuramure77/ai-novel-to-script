@@ -11,7 +11,7 @@
       </div>
       <div class="tbr">
         <!-- Active users -->
-        <div v-if="activeUsers.length > 1" class="active-users" title="当前在线用户">
+        <div v-if="activeUsers.length > 0" class="active-users" title="当前在线用户">
           <span v-for="(u,i) in activeUsers" :key="i" class="au-avatar" :title="u.nickname || u.username">
             {{ (u.nickname || u.username).charAt(0) }}
           </span>
