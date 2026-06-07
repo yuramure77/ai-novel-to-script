@@ -196,4 +196,24 @@ public class ImageService {
         return versionRepo.findById(versionId)
                 .orElseThrow(() -> new RuntimeException("版本不存在"));
     }
+
+    /** Get latest image URL + prompt for all characters and scenes in a project */
+    public Map<String, Object> getLatestImages(Long projectId) {
+        List<ImageVersion> all = versionRepo.findByProjectIdOrderByCreatedAtDesc(projectId);
+        Map<String, Map<String, Object>> chars = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> scenes = new LinkedHashMap<>();
+
+        for (ImageVersion v : all) {
+            String key = String.valueOf(v.getTargetIndex());
+            if (v.getImageType() == ImageType.CHARACTER) {
+                chars.putIfAbsent(key, Map.of("url", v.getUrl(), "prompt",
+                        v.getPrompt() != null ? v.getPrompt() : ""));
+            } else {
+                scenes.putIfAbsent(key, Map.of("url", v.getUrl(), "prompt",
+                        v.getPrompt() != null ? v.getPrompt() : ""));
+            }
+        }
+
+        return Map.of("characters", chars, "scenes", scenes);
+    }
 }

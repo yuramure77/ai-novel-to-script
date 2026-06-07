@@ -84,6 +84,13 @@ public class AiController {
         }
     }
 
+    /** Get latest image for each character/scene in a project (for restore after restart) */
+    @GetMapping("/image/restore")
+    public ResponseEntity<ApiResponse<?>> restoreImages(@RequestParam Long projectId) {
+        var result = imageService.getLatestImages(projectId);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     private Long toLong(Object v) {
         if (v instanceof Number n) return n.longValue();
         if (v instanceof String s) return Long.parseLong(s);

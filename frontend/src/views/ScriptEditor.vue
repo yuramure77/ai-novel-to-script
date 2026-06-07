@@ -292,6 +292,28 @@ const searchOn = ref(false); const sq = ref(''); const sc = ref(0); const sr = r
 // Research
 const rq = ref(''); const srching = ref(false); const sres = ref('')
 
+// Image restore (survive server restart)
+async function restoreImages() {
+  try {
+    const r = await api.get('/ai/image/restore', { params: { projectId: pid } })
+    const data = r.data.data
+    // Restore character images
+    if (data.characters) {
+      for (const [idx, img] of Object.entries(data.characters)) {
+        const i = Number(idx)
+        if (chars.value[i]) chars.value[i] = { ...chars.value[i], image: img.url, prompt: img.prompt || '' }
+      }
+    }
+    // Restore scene images
+    if (data.scenes) {
+      for (const [idx, img] of Object.entries(data.scenes)) {
+        const i = Number(idx)
+        if (sceneImgs.value[i]) sceneImgs.value[i] = { ...sceneImgs.value[i], image: img.url, prompt: img.prompt || '' }
+      }
+    }
+  } catch (e) { console.warn('Image restore skipped:', e) }
+}
+
 // Image preview
 const showPreview = ref(false); const previewUrl = ref(''); const previewPrompt = ref('')
 function previewImg(url, prompt) { previewUrl.value = url; previewPrompt.value = prompt || ''; showPreview.value = true }
@@ -416,6 +438,9 @@ onMounted(async()=>{
     if(v.data.data){latestVersion.value=v.data.data;yaml.value=v.data.data.yamlContent}
     if(originalText.value&&!chapters.value.length)await doSplit()
     cmsgs.value=((await getHistory(pid)).data.data||[]).map(m=>({role:m.role,content:m.content}))
+    // Restore saved images after YAML parsing
+    await nextTick()
+    restoreImages()
   }catch{}
 })
 
