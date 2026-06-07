@@ -106,20 +106,23 @@ public class ImageService {
     private String enrichPrompt(String type, String baseInfo) {
         try {
             String systemPrompt = type.equals("角色")
-                ? "你是一位古装影视剧造型师和美术指导。请根据角色信息，创作一段适合AI图像生成的外貌描写。"
-                  + "必须包含：面容特征、发型头饰、服饰风格、气质氛围。用流畅中文描述，80字以内，不要分段编号。"
-                  + "参考经典文学作品的描写手法，如《红楼梦》的人物出场描写。"
-                : "你是一位古装影视剧美术指导。请根据场景信息，创作一段适合AI图像生成的环境描写。"
-                  + "必须包含：环境氛围、光影色调、建筑或自然景观细节。用流畅中文描述，80字以内，不要分段编号。";
+                ? "你是一位古装影视剧造型师。请根据角色信息，用高度个性化的中文描述其外貌（80字以内）。"
+                  + "必须包含：脸型、眉形眼型、发型头饰、服饰风格、体型姿态、标志性特征。"
+                  + "关键：突出该角色区别于其他人物的独特外貌，避免千篇一律的「剑眉星目」「面如冠玉」。"
+                  + "性格特质要转化为视觉元素——如「孤傲」→下颌微扬冷峻神情，「温柔」→眼含笑意体态柔和。"
+                  + "参考三岛由纪夫《春雪》中松枝清显「纤细优美近乎病态」与本多繁邦「方正刚毅」的对比写法。"
+                : "你是一位古装影视剧美术指导。请根据场景信息，用高度个性化的中文描述环境画面（80字以内）。"
+                  + "必须包含：独特的环境氛围、有辨识度的光影色调、建筑或自然景观的鲜明特征。避免套路化描写。";
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", deepSeekConfig.getModel());
             body.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
-                Map.of("role", "user", "content", baseInfo + "\n请输出视觉描写：")
+                Map.of("role", "user", "content", baseInfo
+                    + "\n请创作高度个性化的视觉描写，突出该" + type + "区别于其他人物的独特外貌特征：")
             ));
             body.put("max_tokens", 300);
-            body.put("temperature", 0.8);
+            body.put("temperature", 0.9);
 
             HttpHeaders headers = deepSeekConfig.createHeaders();
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
