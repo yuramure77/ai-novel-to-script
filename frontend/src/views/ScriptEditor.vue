@@ -68,6 +68,7 @@
 
     <!-- Chapters -->
     <div v-if="chapters.length" class="chaps">
+      <button :class="['ch','full',{on:ac===-1}]" @click="ac=-1">📖 全文</button>
       <button v-for="(c,i) in chapters" :key="i" :class="['ch',{on:ac===i}]" @click="ac=i">{{ c.title }}</button>
     </div>
 
@@ -77,7 +78,7 @@
       <div class="col cl" :style="{width: leftW+'%'}">
         <div class="ct">📖 原文</div>
         <div class="cb" ref="tp">
-          <pre v-html="hl(chapters.length?chapters[ac]?.content||originalText:originalText)"></pre>
+          <pre v-html="hl(ac===-1?originalText:chapters.length?chapters[ac]?.content||originalText:originalText)"></pre>
         </div>
       </div>
 
