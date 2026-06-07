@@ -52,7 +52,7 @@ const rr = { username: [{ required: true, min: 3, max: 50, message: '用户名3-
 
 async function login() {
   if (!await lfr.value.validate().catch(() => false)) return; loading.value = true
-  try { const r = await authApi.login(lf.username, lf.password); const d = r.data.data; localStorage.setItem('token', d.token); localStorage.setItem('nickname', d.nickname || lf.username); router.push('/projects') }
+  try { const r = await authApi.login(lf.username, lf.password); const d = r.data.data; localStorage.setItem('token', d.token); localStorage.setItem('nickname', d.nickname || lf.username); localStorage.setItem('userId', d.userId || ''); router.push('/projects') }
   catch(e) { ElMessage.error(e.response?.data?.message || '登录失败') } finally { loading.value = false }
 }
 async function register() {

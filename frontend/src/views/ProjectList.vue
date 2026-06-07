@@ -79,8 +79,8 @@
             <div class="card-inner">
               <div class="card-head">
                 <h3>{{ p.title }}</h3>
-                <el-tag v-if="!p.isOwner" size="small" round :type="p.permission==='ADMIN'?'warning':'info'">
-                  {{ p.permission==='ADMIN'?'🔧 管理员':'👁 只读' }}
+                <el-tag v-if="!(p.isOwner || p.ownerId === userId)" size="small" round :type="(p.permission||'READ')==='ADMIN'?'warning':'info'">
+                  {{ (p.permission||'READ')==='ADMIN'?'🔧 管理员':'👁 只读' }}
                 </el-tag>
               </div>
               <div class="card-info">
@@ -162,6 +162,7 @@ const projects = ref([]); const loading = ref(false)
 const showCreate = ref(false); const creating = ref(false); const uploading = ref(false)
 const fr = ref(null); const dark = ref(false)
 const nickname = ref(localStorage.getItem('nickname') || '用户')
+const userId = ref(Number(localStorage.getItem('userId') || '0'))
 const form = reactive({ title: '', originalText: '' })
 const rules = { title: [{ required: true, message: '请输入项目名称' }], originalText: [{ required: true, message: '请粘贴或上传原文' }] }
 

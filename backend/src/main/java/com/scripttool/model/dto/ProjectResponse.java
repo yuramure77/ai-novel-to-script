@@ -29,7 +29,7 @@ public class ProjectResponse {
         r.createdAt = p.getCreatedAt(); r.updatedAt = p.getUpdatedAt();
         r.ownerId = p.getUserId();
         r.isOwner = currentUserId != null && p.getUserId().equals(currentUserId);
-        r.permission = r.isOwner ? "ADMIN" : (permission != null ? permission : null);
+        r.permission = r.isOwner ? "ADMIN" : (permission != null && !permission.isBlank() ? permission : "READ");
         return r;
     }
 
