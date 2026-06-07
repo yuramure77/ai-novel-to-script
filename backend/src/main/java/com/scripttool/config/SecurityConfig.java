@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/export/**").permitAll()
                 .requestMatchers("/api/scripts/*/yaml").permitAll()
                 .requestMatchers("/api/ai/**").permitAll()
+                .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()

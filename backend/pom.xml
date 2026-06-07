@@ -107,6 +107,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Spring Boot Actuator — health checks & metrics -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- DevTools (hot reload in development) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
